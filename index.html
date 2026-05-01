@@ -677,8 +677,11 @@ function closePanel(){
 }
 function getC(){return contacts.find(x=>x.id===currentId);}
 function updC(ch){
-  const i=contacts.findIndex(x=>x.id===currentId);if(i<0)return;
-  Object.assign(contacts[i],ch);render();syncOne(contacts[i]);
+  const i=contacts.findIndex(x=>x.id===currentId);if(i<0){toast('Save error: no contact');return;}
+  Object.assign(contacts[i],ch);
+  syncOne(contacts[i]);
+  // Only re-render board for status/tag changes, not every keystroke
+  if(ch.status||ch.tags||ch.issues||ch.tasks){render();}
   if(ch.status)document.getElementById('pstatus').value=ch.status;
   if(ch.name||ch.title||ch.org)renderPanelHdr(contacts[i]);
 }
