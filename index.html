@@ -680,10 +680,11 @@ function updC(ch){
   const i=contacts.findIndex(x=>x.id===currentId);if(i<0){toast('Save error: no contact');return;}
   Object.assign(contacts[i],ch);
   syncOne(contacts[i]);
-  // Only re-render board for status/tag changes, not every keystroke
-  if(ch.status||ch.tags||ch.issues||ch.tasks){render();}
   if(ch.status)document.getElementById('pstatus').value=ch.status;
   if(ch.name||ch.title||ch.org)renderPanelHdr(contacts[i]);
+  // Delay render so it doesn't interrupt active input fields
+  clearTimeout(updC._timer);
+  updC._timer=setTimeout(()=>render(),300);
 }
 function renderPanelHdr(c){
   const[bg,fg]=avC(c.name);
