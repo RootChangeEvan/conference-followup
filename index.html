@@ -334,12 +334,20 @@ async function load(){
   try{
     const{data,error}=await db.from('contacts').select('*').order('created_at');
     if(error)throw error;
-    if(!data.length){contacts=getSkollData();await db.from('contacts').upsert(contacts.map(toDb));}
-    else contacts=data.map(fromDb);
-    cacheLocal();setSyncStatus('saved');
+    if(!data.length){
+      // Truly empty DB — seed with demo data
+      contacts=getSkollData();
+      await db.from('contacts').upsert(contacts.map(toDb));
+    } else {
+      // Always use Supabase data — overwrite any local cache
+      contacts=data.map(fromDb);
+    }
+    cacheLocal(); // update cache with fresh data
+    setSyncStatus('saved');
   }catch(err){
-    console.warn('Supabase:',err.message);
-    try{const d=localStorage.getItem('skoll_cfk');contacts=d?JSON.parse(d):getSkollData();}catch{contacts=getSkollData();}
+    console.warn('Supabase load failed:',err.message);
+    // Only fall back to cache if Supabase completely unavailable
+    try{const d=localStorage.getItem('skoll_cfk');if(d)contacts=JSON.parse(d);}catch{}
     setSyncStatus('offline');
   }
 }
@@ -643,6 +651,14 @@ function openPanel(id){
   document.getElementById('panel').classList.add('open');
 }
 function closePanel(){
+  // Save any unsaved field values before closing
+  if(currentId){
+    const updates={};
+    document.querySelectorAll('[data-f]').forEach(inp=>{
+      updates[inp.dataset.f]=inp.value;
+    });
+    if(Object.keys(updates).length)updC(updates);
+  }
   document.getElementById('backdrop').classList.remove('open');
   document.getElementById('panel').classList.remove('open');
   currentId=null;
@@ -768,9 +784,17 @@ function tmplEmail(c){
 
 // ── Panel bind ────────────────────────────────────────────────────────
 function bindPanel(){
-  // Field save on blur
+  // Save fields on blur AND input for textarea
   document.querySelectorAll('[data-f]').forEach(inp=>{
     inp.addEventListener('blur',()=>{updC({[inp.dataset.f]:inp.value});});
+    // Also save textarea on input with debounce so every keystroke eventually saves
+    if(inp.tagName==='TEXTAREA'){
+      let timer;
+      inp.addEventListener('input',()=>{
+        clearTimeout(timer);
+        timer=setTimeout(()=>updC({[inp.dataset.f]:inp.value}),800);
+      });
+    }
   });
   // Enrich notes button
   const enrichBtn=document.getElementById('enrich-btn');
@@ -1107,15 +1131,12 @@ function toast(msg,dur=2500){const t=document.getElementById('toast');t.textCont
   // Ensure Skoll World Forum always exists as a saved board
   const _boards=JSON.parse(localStorage.getItem('cf_boards')||'[]');
   if(!_boards.includes('Skoll World Forum')){_boards.unshift('Skoll World Forum');localStorage.setItem('cf_boards',JSON.stringify(_boards));}
-  // Default active board to Skoll on first load
   if(!localStorage.getItem('cf_board')){localStorage.setItem('cf_board','Skoll World Forum');}
   currentBoard=localStorage.getItem('cf_board')||'Skoll World Forum';
   currentSource=localStorage.getItem('cf_source')||'Skoll World Forum';
-  // Show cached data instantly
-  try{const d=localStorage.getItem('skoll_cfk');if(d){contacts=JSON.parse(d);render();}}catch{}
   // Set up drag drop
   setupDragDrop();
-  // Load from Supabase
+  // Always load fresh from Supabase first
   await load();
   render();
   if(!getKey())setTimeout(openApiModal,800);
