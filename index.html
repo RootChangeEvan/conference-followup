@@ -833,64 +833,76 @@ function pickScenario(s){
 
 async function enrichNotes(){
   const c=getC();
-  if(!c){toast('Error: no contact selected');return;}
+  if(!c){toast('No contact selected');return;}
   const btn=document.getElementById('enrich-btn');if(btn)btn.disabled=true;
-  const loading=document.getElementById('enrich-loading');if(loading){loading.style.display='';loading.textContent='Enriching notes...';}
-  const current=document.getElementById('desc-field')?.value||c.description||'';
+  const loading=document.getElementById('enrich-loading');
+  if(loading){loading.style.display='block';loading.style.color='var(--text3)';loading.textContent='Enriching notes...';}
+  const field=document.getElementById('desc-field');
+  const current=(field?field.value:null)||c.description||'';
   if(!current.trim()){
     if(loading)loading.style.display='none';
     if(btn)btn.disabled=false;
-    toast('Add some notes first, then hit Enrich');
-    return;
+    toast('Add some notes first');return;
   }
   try{
     const enriched=await callAI(
-      `You are a professional relationship manager helping structure conference contact notes. 
-Transform the raw notes into a clean structured format using EXACTLY these sections (only include sections where there is relevant information):
-
-BACKGROUND: Who they are, their role and organization.
-CONTEXT: How/where we met, what was discussed.
-OPPORTUNITY: Key opportunity, shared interest, or potential collaboration.
-THEIR INTEREST: What they expressed interest in or excitement about.
-NEXT STEPS: Concrete follow-up actions.
-
-Rules:
-- Use plain text only — no asterisks, no markdown, no bullet dashes, no special characters
-- Section headers in ALL CAPS as shown above
-- Each section is 1-3 sentences max, tight and factual
-- For next steps, use a numbered list (1. 2. 3.)
-- Preserve all specific names, organizations, and details from the original
-- Do not add anything not in the original notes
-- Return only the structured notes, no preamble`,
-      `Contact: ${c.name}\nTitle/Org: ${[c.title,c.org].filter(Boolean).join(', ')||'unknown'}\nEvent: ${c.source||'conference'}\nIssues: ${(c.issues||[]).join('; ')||'none'}\nThemes: ${(c.tags||[]).join(', ')||'none'}\nRaw notes: ${current}`
+      'You are a professional relationship manager helping structure conference contact notes.' +
+      ' Transform the raw notes into a clean structured format. Use only these plain-text section headers in ALL CAPS, and only include a section if there is actual content for it:' +
+      ' BACKGROUND: Who they are, role and organization.' +
+      ' CONTEXT: How and where we met, what was discussed.' +
+      ' OPPORTUNITY: Key opportunity, shared interest, or potential collaboration.' +
+      ' THEIR INTEREST: What they expressed interest in or excitement about.' +
+      ' NEXT STEPS: Numbered list of concrete follow-up actions.' +
+      ' Rules: Plain text only. No asterisks, no dashes, no markdown. Numbers for next steps (1. 2. 3.). 1-3 sentences per section max. Preserve every specific name, organization, and detail exactly as written. Do not add anything not in the notes. Return only the structured notes with no preamble or explanation.',
+      'Contact: ' + c.name + '\nTitle/Org: ' + ([c.title,c.org].filter(Boolean).join(', ')||'unknown') + '\nEvent: ' + (c.source||'conference') + '\nIssues: ' + ((c.issues||[]).join('; ')||'none') + '\nThemes: ' + ((c.tags||[]).join(', ')||'none') + '\nRaw notes: ' + current
     );
-    const field=document.getElementById('desc-field');
     if(field)field.value=enriched;
     updC({description:enriched});
-    toast('Notes enriched ✓');
+    if(loading)loading.style.display='none';
+    toast('Notes enriched');
   }catch(e){
     console.error('Enrich error:',e);
-    const msg=e.message||'Unknown error';
-    if(loading){loading.textContent='Error: '+msg;loading.style.color='#c00';}
-    toast('Error: '+msg);
+    if(loading){loading.textContent='Could not enrich: '+e.message;loading.style.color='#c00';}
+    setTimeout(()=>{if(loading)loading.style.display='none';},4000);
   }
-  if(loading)setTimeout(()=>{loading.style.display='none';loading.style.color='';},3000);
   if(btn)btn.disabled=false;
 }
 
+const MODEL_EMAIL_EXAMPLE = `Subject: Great meeting you at Skoll
+
+Erin,
+
+It was a real pleasure meeting you at the Center for Exponential Change breakfast at Skoll. Beryl also enjoyed her conversation with you and came away energized by the exchange.
+
+I was glad we discovered the North Carolina connection as well. Our son lives in the Triangle, so we find ourselves there more often than you might expect.
+
+As you settle back in and continue reflecting on ideas from the Forum, I would welcome the chance to hear how your thinking evolves around the KX partnership and whether there may be natural points of connection with your work. And if an in-person conversation makes sense during a future visit, I would be glad to make that happen.
+
+No rush — I simply wanted to keep the thread open and say how much I appreciated the chance to connect.
+
+Best, Evan`;
+
+const EMAIL_STYLE_GUIDE = 'Write in a warm, natural, professional voice. Avoid overly polished, generic, or AI-sounding language. The tone should feel thoughtful and human, but not gushy. Keep the email concise, usually 2-4 short paragraphs. Open by referencing the specific place or context where we met. Include one genuine personal or relational detail only if one is present in the notes — if there is no personal detail, skip it entirely. Connect naturally to the professional topic without overstating the opportunity. Avoid hard selling, exaggerated enthusiasm, or phrases like "excited to explore synergies," "it was truly inspiring," "the right people finding each other," or "circle back." End lightly, with an open invitation and no pressure. Make it sound like a real person wrote it. No subject line. Sign off: Best, Evan.';
 
 async function genEmail(){
   const c=getC();const scenario=scenarioMap[c.id]||'nicetomeet';
   const btn=document.getElementById('gen-btn');if(btn)btn.disabled=true;
   const loading=document.getElementById('email-loading');if(loading)loading.style.display='';
-  const ctx=`Contact: ${c.name}\nTitle/Org: ${[c.title,c.org].filter(Boolean).join(', ')||'unknown'}\nEmail: ${c.email||'n/a'}\nIssues: ${(c.issues||[]).join('; ')||'none'}\nThemes: ${(c.tags||[]).join(', ')||'none'}\nNotes: ${c.description||'none'}\nConference: ${c.source||currentSource||'conference'}`;
-  const prompts={
-    nicetomeet:`You are Evan from Root Change. Write a brief, warm conference follow-up. 2 short paragraphs max. Open by referencing one specific thing from the conversation. Close with a simple offer to stay in touch — no hard ask. Sign off "Best, Evan". Return only the email body, no subject.`,
-    substantive:`You are Evan from Root Change. Write a focused follow-up referencing a meaningful conversation. 2-3 tight paragraphs. Name one specific point they raised, connect it briefly to Root Change's work, and propose one concrete next step (a short call). End: "Would you be open to a brief call in the next few weeks?" Sign off "Best, Evan". Return only the email body, no subject.`,
-    continuing:`You are Evan from Root Change. Write a short note continuing an ongoing exchange. 2 paragraphs. Acknowledge the conversation warmly, name one area of overlap, propose moving it forward. End: "Would it make sense to find 30 minutes to think this through?" Sign off "Best, Evan". Return only the email body, no subject.`
+
+  const ctx='Contact: '+c.name+'\nTitle/Org: '+([c.title,c.org].filter(Boolean).join(', ')||'unknown')+'\nEmail: '+(c.email||'n/a')+'\nIssues discussed: '+((c.issues||[]).join('; ')||'none')+'\nThemes: '+((c.tags||[]).join(', ')||'none')+'\nMeeting notes: '+(c.description||'none')+'\nConference/event: '+(c.source||currentSource||'conference');
+
+  const intros={
+    nicetomeet:'This is a first follow-up after meeting at a conference or event.',
+    substantive:'This follows a more substantive conversation. There may be a resource, idea, or next step to reference.',
+    continuing:'This continues an ongoing exchange that has already had some back-and-forth.'
   };
+
+  const sys='You are helping Evan from Root Change write a follow-up email after meeting someone at a conference or event. ' +
+    intros[scenario] + ' ' + EMAIL_STYLE_GUIDE +
+    '\n\nHere is a model email that shows the right tone and style. Match this voice closely:\n\n' + MODEL_EMAIL_EXAMPLE;
+
   try{
-    const email=await callAI(prompts[scenario],ctx);
+    const email=await callAI(sys,ctx);
     updC({emailDraft:email});
   }catch(e){toast('Error: '+e.message);}
   renderPanelBody();
