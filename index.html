@@ -3,1160 +3,1426 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Follow-Up</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<title>Pando Mapper — Data Cleaning</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#f0efe9;--col:#e8e7e0;--surface:#fff;--border:#e0ddd4;--border2:#c8c5bb;
-  --text:#18170f;--text2:#6a6960;--text3:#a8a79f;
-  --teal:#0d7a5f;--teal-bg:#e4f4ef;
-  --radius:10px;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
-  --shadow-lg:0 8px 24px rgba(0,0,0,.1),0 2px 6px rgba(0,0,0,.06);
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;overflow:hidden;}
-body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;}
+  :root {
+    --forest:    #1a3a2a;
+    --moss:      #2d5a3d;
+    --fern:      #4a8c5c;
+    --sage:      #8ab89a;
+    --mist:      #e8f0eb;
+    --cream:     #f7f4ef;
+    --bark:      #3d2b1f;
+    --amber:     #c8833a;
+    --clay:      #d4604a;
+    --gold:      #e0a850;
+    --white:     #ffffff;
+    --shadow:    rgba(26,58,42,0.12);
+  }
 
-/* Top bar */
-.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 18px;z-index:50;flex-shrink:0;}
-.logo{font-size:15px;font-weight:700;letter-spacing:-.3px;margin-right:6px;white-space:nowrap;cursor:pointer;color:var(--teal);}
-.logo:hover{opacity:.8;}
-.search-wrap{position:relative;flex:1;max-width:220px;}
-.search-wrap input{width:100%;padding:6px 10px 6px 30px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-family:inherit;font-size:13px;color:var(--text);outline:none;}
-.search-wrap input:focus{border-color:var(--teal);background:#fff;}
-.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;}
-.tag-bar{display:flex;gap:5px;overflow-x:auto;padding:2px 0;flex:1;}
-.tag-bar::-webkit-scrollbar{display:none;}
-.tf{padding:4px 11px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--text2);}
-.tf:hover{border-color:var(--border2);color:var(--text);}
-.tf.active{background:var(--text);color:#fff;border-color:var(--text);}
-.topbar-right{margin-left:auto;display:flex;gap:7px;align-items:center;flex-shrink:0;}
-.board-tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 18px;display:flex;align-items:center;gap:6px;overflow-x:auto;flex-shrink:0;height:42px;}
-.board-tabs-bar::-webkit-scrollbar{display:none;}
-.btab{padding:5px 14px;border-radius:20px;border:1px solid transparent;background:transparent;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--text2);white-space:nowrap;transition:all .15s;}
-.btab:hover{background:var(--col);color:var(--text);border-color:transparent;}
-.btab.active{background:var(--text);color:#fff;border-color:var(--text);}
-.btab.all{color:var(--text3);}
-.btab.all.active{background:var(--text2);color:#fff;border-color:var(--text2);}
-.btab-new{padding:5px 12px;border-radius:20px;border:1.5px dashed var(--border2);background:transparent;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);white-space:nowrap;}
-.btab-new:hover{background:var(--col);color:var(--text2);border-color:var(--border2);}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Buttons */
-button{font-family:inherit;font-size:13px;font-weight:500;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:7px 13px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
-button:hover{background:var(--col);border-color:var(--border2);}
-button:active{transform:scale(.98);}
-button:disabled{opacity:.45;cursor:not-allowed;transform:none;}
-button.primary{background:var(--text);color:#fff;border-color:var(--text);}
-button.primary:hover{background:#2a2a2a;border-color:#2a2a2a;}
-button.ghost{border-color:transparent;background:transparent;color:var(--text2);padding:6px 10px;}
-button.ghost:hover{background:var(--col);color:var(--text);border-color:transparent;}
-button.icon-btn{padding:5px 7px;font-size:15px;line-height:1;background:none;border-color:transparent;color:var(--text3);}
-button.icon-btn:hover{background:var(--col);color:var(--text);border-color:transparent;}
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--forest);
+    min-height: 100vh;
+  }
 
-/* Board */
-.board-wrap{display:flex;flex-direction:column;height:calc(100vh - 94px);}
-.board{display:flex;gap:12px;padding:16px 18px 20px;overflow-x:auto;flex:1;align-items:flex-start;}
-.board::-webkit-scrollbar{height:5px;}
-.board::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+  /* ── Header ── */
+  header {
+    background: var(--forest);
+    padding: 0 48px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+  }
 
-/* Columns */
-.col{flex-shrink:0;width:276px;background:var(--col);border-radius:12px;display:flex;flex-direction:column;max-height:100%;border:2px solid transparent;transition:border-color .2s,background .2s;}
-.col.drag-over{border-color:var(--teal);background:rgba(13,122,95,.06);}
-.col-header{padding:11px 13px 7px;display:flex;align-items:center;gap:7px;flex-shrink:0;}
-.col-pip{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.col-title{font-size:13px;font-weight:700;flex:1;}
-.col-badge{font-size:11px;font-weight:700;padding:1px 7px;border-radius:20px;}
-.col-scroll{padding:0 8px 6px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px;min-height:60px;}
-.col-addbtn{padding:4px 8px 8px;}
-.col-addbtn button{width:100%;justify-content:center;background:transparent;border:1.5px dashed var(--border2);color:var(--text3);font-size:12px;}
-.col-addbtn button:hover{background:var(--surface);border-style:solid;color:var(--text2);}
-.col[data-col="todo"] .col-pip{background:#aaa;}
-.col[data-col="todo"] .col-badge{background:#ddddd5;color:#555;}
-.col[data-col="outreach"] .col-pip{background:#378add;}
-.col[data-col="outreach"] .col-badge{background:#dbeafe;color:#1d4ed8;}
-.col[data-col="dialogue"] .col-pip{background:#d97706;}
-.col[data-col="dialogue"] .col-badge{background:#fef3c7;color:#92400e;}
-.col[data-col="done"] .col-pip{background:#639922;}
-.col[data-col="done"] .col-badge{background:#ecf8d8;color:#3b6d11;}
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    color: var(--white);
+    letter-spacing: 0.02em;
+  }
 
-/* Cards */
-.card{background:var(--surface);border-radius:10px;padding:11px 13px;border:1px solid var(--border);box-shadow:var(--shadow);cursor:grab;transition:box-shadow .15s,transform .15s;position:relative;user-select:none;}
-.card:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px);border-color:var(--border2);}
-.card.is-dragging{opacity:.4;transform:scale(.97);cursor:grabbing;}
-.card *{pointer-events:none;}
-.card-top{display:flex;align-items:flex-start;gap:9px;margin-bottom:8px;}
-.av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;font-size:12px;}
-.card-meta{flex:1;min-width:0;}
-.card-name{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:1px;}
-.card-sub{font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px;}
-.tag{display:inline-flex;align-items:center;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:700;}
-.card-footer{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text3);}
-.prog-bar{width:44px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:4px;}
-.prog-fill{height:100%;background:var(--teal);border-radius:2px;}
-.assignee-dots{display:flex;gap:2px;}
-.assignee-dot{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;}
+  .logo span { color: var(--sage); font-style: italic; }
 
-/* Side panel */
-.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.18);z-index:200;display:none;}
-.backdrop.open{display:block;}
-.panel{position:fixed;top:0;right:0;bottom:0;width:440px;background:var(--surface);z-index:201;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .24s ease;border-left:1px solid var(--border);box-shadow:var(--shadow-lg);}
-.panel.open{transform:translateX(0);}
-.panel-hdr{padding:15px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;}
-.panel-hdr-meta{flex:1;min-width:0;}
-.panel-name{font-size:16px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.panel-sub{font-size:12px;color:var(--text2);margin-top:1px;}
-.panel-tabs{display:flex;padding:0 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
-.ptab{padding:9px 12px;font-size:12px;font-weight:500;color:var(--text2);border:none;border-bottom:2px solid transparent;border-radius:0;cursor:pointer;background:none;margin-bottom:-1px;white-space:nowrap;}
-.ptab:hover{color:var(--text);background:none;}
-.ptab.active{color:var(--text);border-bottom-color:var(--text);font-weight:600;}
-.panel-body{flex:1;overflow-y:auto;padding:18px;}
-.psec{margin-bottom:18px;}
-.psec+.psec{border-top:1px solid var(--border);padding-top:18px;}
-.fl{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px;}
-input[type=text],input[type=email],input[type=date],input[type=password],select,textarea{font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:8px;padding:7px 10px;background:var(--surface);color:var(--text);outline:none;width:100%;transition:border-color .15s;}
-input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(13,122,95,.1);}
-textarea{resize:vertical;line-height:1.6;}
-.row{display:flex;gap:8px;align-items:center;}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.chip{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;background:var(--col);color:var(--text);border:1px solid var(--border);}
-.chip-x{background:none;border:none;padding:0;cursor:pointer;color:var(--text3);font-size:13px;line-height:1;}
-.chips-row{display:flex;flex-wrap:wrap;gap:5px;min-height:24px;}
-.task-row{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);}
-.task-row:last-child{border-bottom:none;}
-.tcheck{width:15px;height:15px;margin-top:2px;cursor:pointer;accent-color:var(--teal);flex-shrink:0;}
-.divider{height:1px;background:var(--border);margin:14px 0;}
-.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 10px;}
-@keyframes spin{to{transform:rotate(360deg);}}
+  .header-meta {
+    font-size: 13px;
+    color: var(--sage);
+    font-weight: 300;
+  }
 
-/* Modals */
-.mbackdrop{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:300;display:none;align-items:center;justify-content:center;}
-.mbackdrop.open{display:flex;}
-.modal{background:var(--surface);border-radius:14px;width:500px;max-width:95vw;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg);}
-.modal-hdr{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:1;}
-.modal-hdr h2{font-size:16px;font-weight:700;}
-.modal-body{padding:18px 22px;}
-.modal-foot{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+  /* ── Layout ── */
+  .shell {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
 
-/* Status bar */
-.statusbar{height:28px;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:0 18px;font-size:11px;color:var(--text3);flex-shrink:0;}
-.sdot{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite;flex-shrink:0;}
-@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
-@keyframes pillpulse{0%,100%{box-shadow:0 0 0 0 rgba(217,119,6,.3);}50%{box-shadow:0 0 0 4px rgba(217,119,6,0);}}
+  /* ── Step system ── */
+  .steps-nav {
+    display: flex;
+    gap: 0;
+    margin-bottom: 40px;
+    background: var(--white);
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow: 0 2px 12px var(--shadow);
+  }
 
-/* Toast */
-.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;transition:opacity .25s;pointer-events:none;z-index:999;}
-.toast.show{opacity:1;}
+  .step-dot {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 4px;
+    border-radius: 8px;
+    cursor: default;
+    transition: background 0.2s;
+  }
 
-/* Scenario radio */
-.scenario-opt{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;background:var(--surface);transition:all .15s;margin-bottom:6px;}
-.scenario-opt.sel{border-color:var(--teal);background:var(--teal-bg);}
+  .step-dot.active { background: var(--mist); }
+  .step-dot.done .dot { background: var(--fern); }
+
+  .dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    transition: background 0.3s;
+  }
+
+  .step-dot.active .dot { background: var(--moss); }
+  .step-dot.done .dot { background: var(--fern); }
+
+  .step-label {
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+    line-height: 1.3;
+    font-weight: 500;
+  }
+
+  .step-dot.active .step-label { color: var(--forest); }
+  .step-dot.done .step-label { color: var(--fern); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 36px 40px;
+    box-shadow: 0 2px 16px var(--shadow);
+    margin-bottom: 24px;
+  }
+
+  .card-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 26px;
+    color: var(--forest);
+    margin-bottom: 8px;
+  }
+
+  .card-subtitle {
+    font-size: 15px;
+    color: #666;
+    margin-bottom: 28px;
+    line-height: 1.5;
+  }
+
+  /* ── Form elements ── */
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--forest);
+    margin-bottom: 6px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  input[type=text], input[type=number], select {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid #ddd;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    color: var(--forest);
+    background: var(--white);
+    transition: border-color 0.2s;
+    outline: none;
+  }
+
+  input[type=text]:focus, input[type=number]:focus, select:focus {
+    border-color: var(--fern);
+    box-shadow: 0 0 0 3px rgba(74,140,92,0.12);
+  }
+
+  .form-row { margin-bottom: 20px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* ── File upload ── */
+  .upload-zone {
+    border: 2px dashed var(--sage);
+    border-radius: 12px;
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--mist);
+    position: relative;
+  }
+
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--fern); background: #deeee4; }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+  .upload-icon { font-size: 36px; margin-bottom: 10px; }
+  .upload-text { font-size: 16px; font-weight: 500; color: var(--moss); }
+  .upload-hint { font-size: 13px; color: #888; margin-top: 4px; }
+  .upload-filename { font-size: 14px; color: var(--fern); font-weight: 600; margin-top: 8px; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--forest);
+    color: white;
+  }
+  .btn-primary:hover { background: var(--moss); transform: translateY(-1px); box-shadow: 0 4px 12px var(--shadow); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-secondary {
+    background: var(--mist);
+    color: var(--forest);
+    border: 1.5px solid var(--sage);
+  }
+  .btn-secondary:hover { background: #dde9e2; }
+
+  .btn-success {
+    background: var(--fern);
+    color: white;
+  }
+  .btn-success:hover { background: var(--moss); }
+
+  .btn-ghost {
+    background: transparent;
+    color: #888;
+    border: 1.5px solid #ddd;
+    padding: 10px 20px;
+    font-size: 13px;
+  }
+  .btn-ghost:hover { border-color: #bbb; color: #555; }
+
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    align-items: center;
+  }
+
+  /* ── Cluster review ── */
+  .cluster-card {
+    border: 1.5px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+    background: var(--white);
+    transition: border-color 0.2s;
+  }
+
+  .cluster-card.resolved { border-color: var(--sage); background: #f4faf6; }
+  .cluster-card.skipped  { opacity: 0.5; }
+
+  .cluster-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .cluster-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sage);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .cluster-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+
+  .badge-resolved { background: #e0f5e8; color: var(--fern); }
+  .badge-skipped  { background: #f0f0f0; color: #999; }
+
+  .name-list { margin-bottom: 16px; }
+
+  .name-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    background: var(--cream);
+  }
+
+  .name-item.recommended { background: var(--mist); border-left: 3px solid var(--fern); }
+
+  .name-text { font-size: 15px; flex: 1; }
+  .name-count { font-size: 12px; color: #999; white-space: nowrap; }
+  .name-score { font-size: 11px; color: var(--sage); white-space: nowrap; }
+  .name-tag {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: var(--gold);
+    color: white;
+    font-weight: 700;
+  }
+
+  .canonical-input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .canonical-input-row .form-row { flex: 1; margin-bottom: 0; }
+
+  /* ── Conflict card ── */
+  .conflict-card {
+    border: 1.5px solid #f0e8e0;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+    background: #fffaf7;
+  }
+
+  .conflict-card.resolved { border-color: var(--sage); background: #f4faf6; }
+
+  .conflict-org {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--forest);
+    margin-bottom: 12px;
+  }
+
+  .conflict-attr {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--amber);
+    margin-bottom: 8px;
+  }
+
+  .value-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .value-option {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1.5px solid #ddd;
+    font-size: 13px;
+    cursor: pointer;
+    background: white;
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .value-option:hover { border-color: var(--fern); color: var(--fern); }
+  .value-option.selected { background: var(--fern); color: white; border-color: var(--fern); }
+  .value-option.majority { border-color: var(--amber); }
+
+  /* ── Summary stats ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .stat-box {
+    background: var(--mist);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 36px;
+    color: var(--forest);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+  }
+
+  .breakdown-row:last-child { border-bottom: none; }
+  .breakdown-label { color: #555; }
+  .breakdown-val { font-weight: 600; color: var(--forest); }
+
+  /* ── Progress ── */
+  .progress-bar {
+    height: 6px;
+    background: #e8e8e8;
+    border-radius: 3px;
+    margin: 16px 0;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--fern);
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+
+  .progress-text {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 8px;
+  }
+
+  /* ── Alerts / notices ── */
+  .notice {
+    padding: 14px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .notice-info    { background: #e8f4fd; color: #1a5276; border-left: 3px solid #3498db; }
+  .notice-success { background: #e8f8ee; color: #1a5e33; border-left: 3px solid var(--fern); }
+  .notice-warn    { background: #fef9e7; color: #7d6608; border-left: 3px solid var(--gold); }
+
+  /* ── Loading ── */
+  .spinner {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(247,244,239,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    backdrop-filter: blur(2px);
+  }
+
+  .loading-overlay .spinner {
+    width: 40px; height: 40px;
+    border-width: 3px;
+    border-color: var(--sage);
+    border-top-color: var(--forest);
+  }
+
+  .loading-text {
+    margin-top: 16px;
+    font-size: 16px;
+    color: var(--forest);
+    font-weight: 500;
+  }
+
+  /* ── Download ── */
+  .download-box {
+    background: var(--forest);
+    border-radius: 16px;
+    padding: 32px 36px;
+    color: white;
+    text-align: center;
+  }
+
+  .download-box h3 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+
+  .download-box p { color: var(--sage); margin-bottom: 24px; font-size: 15px; }
+
+  .download-files {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .download-file {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: 13px;
+    color: var(--mist);
+  }
+
+  .download-file strong { display: block; font-size: 16px; color: white; margin-bottom: 2px; }
+
+  /* ── Utility ── */
+  .hidden { display: none !important; }
+  .mt8 { margin-top: 8px; }
+  .mt16 { margin-top: 16px; }
+  .mt24 { margin-top: 24px; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .all-done-msg {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--fern);
+  }
+
+  .all-done-msg .checkmark { font-size: 48px; margin-bottom: 12px; }
+  .all-done-msg p { font-size: 16px; color: #666; }
+
+  /* ── Jump nav ── */
+  .jump-nav {
+    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 24px;
+    padding: 12px 16px;
+    background: var(--white);
+    border-radius: 10px;
+    box-shadow: 0 1px 8px var(--shadow);
+    font-size: 12px;
+  }
+  .jump-nav.visible { display: flex; }
+  .jump-nav-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #999;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-right: 4px;
+  }
+  .jump-btn {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--sage);
+    background: transparent;
+    color: var(--moss);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .jump-btn:hover { background: var(--mist); }
+  .jump-btn.active { background: var(--forest); color: white; border-color: var(--forest); }
+
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    header { padding: 0 20px; }
+    .shell { padding: 24px 16px 60px; }
+    .card { padding: 24px 20px; }
+  }
+
+  /* ── Cluster search bar ── */
+  .cluster-search-bar { position:sticky; top:64px; z-index:50; background:var(--cream); padding:10px 0 12px; margin-bottom:12px; display:flex; gap:8px; align-items:center; }
+  .cluster-search-wrap { position:relative; flex:1; }
+  .cluster-search-wrap svg { position:absolute; left:11px; top:50%; transform:translateY(-50%); pointer-events:none; color:#aaa; }
+  .cluster-search-input { width:100%; padding:9px 12px 9px 34px; border:1.5px solid #ddd; border-radius:8px; font-family:'DM Sans',sans-serif; font-size:14px; color:var(--forest); background:var(--white); outline:none; transition:border-color .2s,box-shadow .2s; }
+  .cluster-search-input:focus { border-color:var(--fern); box-shadow:0 0 0 3px rgba(74,140,92,.1); }
+  .search-nav-btn { padding:8px 12px; border:1.5px solid #ddd; border-radius:8px; background:var(--white); font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; color:#666; cursor:pointer; white-space:nowrap; transition:background .15s,border-color .15s; }
+  .search-nav-btn:hover { background:var(--mist); border-color:var(--sage); }
+  .search-nav-btn:disabled { opacity:.4; cursor:default; }
+  .search-match-label { font-size:12px; color:#999; white-space:nowrap; min-width:56px; text-align:right; }
+  .cluster-card.search-highlight { border-color:var(--fern); box-shadow:0 0 0 3px rgba(74,140,92,.15); }
+  /* ── Filter pills ── */
+  .filter-bar { display:flex; gap:6px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+  .filter-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#aaa; margin-right:2px; }
+  .filter-pill { padding:5px 14px; border-radius:20px; border:1.5px solid #ddd; background:var(--white); font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; color:#777; cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .filter-pill:hover { border-color:var(--sage); color:var(--moss); }
+  .filter-pill.active { background:var(--forest); border-color:var(--forest); color:white; }
+  /* ── Keep Separate ── */
+  .name-item.keep-sep { background:#fff8ec; border-left:3px solid var(--amber); }
+  .btn-keep-sep { padding:4px 10px; border-radius:20px; border:1.5px solid #ddd; background:var(--white); font-family:'DM Sans',sans-serif; font-size:11px; font-weight:600; color:#888; cursor:pointer; white-space:nowrap; transition:all .15s; letter-spacing:.02em; }
+  .btn-keep-sep:hover { border-color:var(--amber); color:var(--amber); background:#fff8ec; }
+  .btn-keep-sep.active { background:#fff3dc; border-color:var(--amber); color:var(--amber); }
+  .keep-sep-tag { font-size:10px; padding:2px 7px; border-radius:10px; background:var(--amber); color:white; font-weight:700; white-space:nowrap; }
+  /* ── Save bar ── */
+  .save-bar { display:none; align-items:center; gap:10px; padding:8px 16px; background:rgba(255,255,255,.07); border-radius:8px; margin-left:auto; }
+  .save-bar.visible { display:flex; }
+  .save-status { font-size:12px; color:var(--sage); min-width:120px; text-align:right; }
+  .save-status.saving { color:var(--gold); }
+  .save-status.saved  { color:#7ecb8f; }
+  .save-status.error  { color:#e88; }
+  .btn-save-now { padding:5px 12px; border-radius:6px; border:1px solid rgba(255,255,255,.2); background:transparent; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; color:var(--sage); cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .btn-save-now:hover { background:rgba(255,255,255,.1); color:white; }
+  .autosave-toggle { display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; }
+  .autosave-toggle-label { font-size:12px; color:var(--sage); white-space:nowrap; }
+  .toggle-track { width:32px; height:18px; border-radius:9px; background:rgba(255,255,255,.15); position:relative; transition:background .2s; flex-shrink:0; }
+  .toggle-track.on { background:var(--fern); }
+  .toggle-thumb { width:14px; height:14px; border-radius:50%; background:white; position:absolute; top:2px; left:2px; transition:left .2s; }
+  .toggle-track.on .toggle-thumb { left:16px; }
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <div class="logo">Follow-Up</div>
-  <div class="search-wrap">
-    <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input type="text" id="search" placeholder="Search contacts..." oninput="render()">
+<header>
+  <div class="logo">Pando <span>Mapper</span></div>
+  <div class="header-meta">Data Cleaning Tool — Root Change</div>
+  <div class="save-bar" id="save-bar">
+    <span class="save-status" id="save-status"></span>
+    <button class="btn-save-now" onclick="saveNow()" title="Save progress now">&#128190; Save</button>
+    <div class="autosave-toggle" onclick="toggleAutosave()" title="Toggle autosave">
+      <div class="toggle-track" id="autosave-track"><div class="toggle-thumb"></div></div>
+      <span class="autosave-toggle-label">Autosave</span>
+    </div>
   </div>
-  <div class="topbar-right">
-    <button class="primary" onclick="openAdd()">+ Add contact</button>
-    <button id="api-pill" onclick="openApiModal()" style="font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;gap:5px;transition:all .2s;"></button>
-  </div>
-</div>
-<div class="board-tabs-bar" id="board-tabs-bar">
-  <!-- filled by renderBoardTabs() -->
-</div>
+</header>
 
-<div class="board-wrap">
-  <div class="board" id="board">
-    <div class="col" data-col="todo">
-      <div class="col-header"><div class="col-pip"></div><div class="col-title">To Do</div><div class="col-badge" id="cnt-todo">0</div></div>
-      <div class="col-scroll" id="cards-todo"></div>
-      <div class="col-addbtn"><button onclick="openAdd('todo')">+ Add</button></div>
-    </div>
-    <div class="col" data-col="outreach">
-      <div class="col-header"><div class="col-pip"></div><div class="col-title">Outreach Sent</div><div class="col-badge" id="cnt-outreach">0</div></div>
-      <div class="col-scroll" id="cards-outreach"></div>
-      <div class="col-addbtn"><button onclick="openAdd('outreach')">+ Add</button></div>
-    </div>
-    <div class="col" data-col="dialogue">
-      <div class="col-header"><div class="col-pip"></div><div class="col-title">In Dialogue</div><div class="col-badge" id="cnt-dialogue">0</div></div>
-      <div class="col-scroll" id="cards-dialogue"></div>
-      <div class="col-addbtn"><button onclick="openAdd('dialogue')">+ Add</button></div>
-    </div>
-    <div class="col" data-col="done">
-      <div class="col-header"><div class="col-pip"></div><div class="col-title">Done</div><div class="col-badge" id="cnt-done">0</div></div>
-      <div class="col-scroll" id="cards-done"></div>
-      <div class="col-addbtn"><button onclick="openAdd('done')">+ Add</button></div>
-    </div>
-  </div>
-  <div class="statusbar">
-    <div class="sdot"></div>
-    <span id="sbar">Loading...</span>
-    <span id="sync-status" style="margin-left:auto;display:flex;align-items:center;gap:5px;"></span>
-  </div>
-</div>
+<div class="shell">
 
-<!-- Side panel -->
-<div class="backdrop" id="backdrop" onclick="closePanel()"></div>
-<div class="panel" id="panel">
-  <div class="panel-hdr">
-    <div class="av" id="pav" style="width:40px;height:40px;"></div>
-    <div class="panel-hdr-meta">
-      <div class="panel-name" id="pname"></div>
-      <div class="panel-sub" id="psub"></div>
+  <!-- Step nav -->
+  <div class="steps-nav">
+    <div class="step-dot active" id="nav-0">
+      <div class="dot">1</div>
+      <div class="step-label">Upload</div>
     </div>
-    <select id="pstatus" style="width:auto;font-size:12px;" onchange="updC({status:this.value})">
-      <option value="todo">To Do</option>
-      <option value="outreach">Outreach Sent</option>
-      <option value="dialogue">In Dialogue</option>
-      <option value="done">Done</option>
-    </select>
-    <button class="icon-btn" onclick="closePanel()">&#x2715;</button>
-  </div>
-  <div class="panel-tabs">
-    <button class="ptab active" onclick="switchPTab('overview',this)">Overview</button>
-    <button class="ptab" onclick="switchPTab('issues',this)">Issues &amp; tags</button>
-    <button class="ptab" onclick="switchPTab('tasks',this)" id="ptab-tasks">Tasks</button>
-    <button class="ptab" onclick="switchPTab('email',this)">Email draft</button>
-  </div>
-  <div class="panel-body" id="pbody"></div>
-</div>
-
-<!-- Add modal -->
-<div class="mbackdrop" id="add-modal">
-  <div class="modal">
-    <div class="modal-hdr"><h2>Add contact</h2><button class="icon-btn" onclick="closeAdd()">&#x2715;</button></div>
-    <div class="modal-body" id="add-body"></div>
-  </div>
-</div>
-
-<!-- New event modal -->
-<div class="mbackdrop" id="new-event-modal">
-  <div class="modal" style="width:400px;">
-    <div class="modal-hdr"><h2>New event board</h2><button class="icon-btn" onclick="closeNewEventModal()">&#x2715;</button></div>
-    <div class="modal-body">
-      <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Create a new board for a conference or event. You can switch between boards any time.</p>
-      <label class="fl">Event name</label>
-      <input type="text" id="new-event-inp" placeholder="e.g. World Bank Spring Meetings 2025..." style="margin-bottom:4px;">
+    <div class="step-dot" id="nav-1">
+      <div class="dot">2</div>
+      <div class="step-label">Name Review</div>
     </div>
-    <div class="modal-foot">
-      <button onclick="closeNewEventModal()">Cancel</button>
-      <button class="primary" onclick="createEventBoard()">Create board</button>
+    <div class="step-dot" id="nav-2">
+      <div class="dot">3</div>
+      <div class="step-label">Org Types</div>
+    </div>
+    <div class="step-dot" id="nav-3">
+      <div class="dot">4</div>
+      <div class="step-label">Attributes</div>
+    </div>
+    <div class="step-dot" id="nav-4">
+      <div class="dot">5</div>
+      <div class="step-label">Summary</div>
+    </div>
+    <div class="step-dot" id="nav-5">
+      <div class="dot">6</div>
+      <div class="step-label">Download</div>
     </div>
   </div>
-</div>
 
-<!-- API key modal -->
-<div class="mbackdrop" id="api-modal">
-  <div class="modal" style="width:420px;">
-    <div class="modal-hdr"><h2>Anthropic API Key</h2><button class="icon-btn" onclick="closeApiModal()">&#x2715;</button></div>
-    <div class="modal-body">
-      <div id="api-current-wrap" style="display:none;background:var(--col);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);">Current key</span>
-          <span id="api-status-chip" style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#e4f4ef;color:#0d7a5f;">Active</span>
+  <!-- Jump nav — visible after upload, works from any step -->
+  <div class="jump-nav" id="jump-nav">
+    <span class="jump-nav-label">Jump to:</span>
+    <button class="jump-btn" data-jump="1">Name Review</button>
+    <button class="jump-btn" data-jump="2">Org Types</button>
+    <button class="jump-btn" data-jump="3">Attributes</button>
+    <button class="jump-btn" data-jump="4">Summary</button>
+    <button class="jump-btn" data-jump="5">Download</button>
+  </div>
+
+  <!-- ── STEP 1: Upload ── -->
+  <div class="section active" id="step-0">
+    <div class="card">
+      <div class="card-title">Upload Survey Data</div>
+      <div class="card-subtitle">Upload the raw Alchemer export for this year. The file should be the unmodified export — no pre-cleaning needed.</div>
+
+      <div class="form-grid mt16">
+        <div class="form-row">
+          <label>Your Name</label>
+          <input type="text" id="reviewer-name" placeholder="e.g. Maria Garcia">
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-          <span id="api-masked" style="font-family:monospace;font-size:12px;color:var(--text);"></span>
-          <button onclick="clearKey()" style="font-size:11px;color:#b00;border-color:#fca5a5;background:#fee2e2;padding:4px 10px;">Remove</button>
+        <div class="form-row">
+          <label>Survey Year</label>
+          <input type="number" id="survey-year" value="2024" min="2020" max="2030">
         </div>
       </div>
-      <label class="fl" id="api-input-label">Enter API key</label>
-      <div style="position:relative;margin-bottom:8px;">
-        <input type="password" id="apikey" placeholder="sk-ant-..." style="padding-right:42px;font-family:monospace;font-size:12px;" oninput="onKeyInput()">
-        <button onclick="toggleShow()" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;padding:4px 6px;font-size:13px;color:var(--text3);">&#128065;</button>
+
+      <div class="form-row mt8">
+        <label>Alchemer Export File</label>
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="file-input" accept=".csv,.xlsx,.xls">
+          <div class="upload-icon">📂</div>
+          <div class="upload-text">Click to choose file or drag and drop</div>
+          <div class="upload-hint">Accepts .xlsx or .csv</div>
+          <div class="upload-filename hidden" id="upload-filename"></div>
+        </div>
       </div>
-      <div id="api-msg" style="font-size:12px;min-height:18px;margin-bottom:10px;"></div>
-      <p style="font-size:11px;color:var(--text3);">Stored in your browser only. Get a key at <a href="https://console.anthropic.com" target="_blank" style="color:var(--teal);">console.anthropic.com</a>.</p>
-    </div>
-    <div class="modal-foot">
-      <button onclick="closeApiModal()">Cancel</button>
-      <button id="test-btn" onclick="testKey()" style="display:none;">Test key</button>
-      <button class="primary" id="save-key-btn" onclick="saveApiKey()" disabled style="opacity:.45;">Save key</button>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="upload-btn" onclick="doUpload()" disabled>
+          Begin Cleaning →
+        </button>
+      </div>
     </div>
   </div>
-</div>
 
-<div id="debug-panel" style="display:none;position:fixed;bottom:40px;right:16px;width:300px;background:#1e1e1e;color:#0f0;font-family:monospace;font-size:11px;padding:12px;border-radius:8px;z-index:9999;max-height:300px;overflow-y:auto;line-height:1.6;">
-  <div style="color:#fff;font-weight:bold;margin-bottom:6px;">Drag Debug Log <button onclick="document.getElementById('debug-log').innerHTML=''" style="font-size:10px;padding:1px 6px;margin-left:8px;background:#333;color:#fff;border-color:#555;">Clear</button></div>
-  <div id="debug-log"></div>
-</div>
+  <!-- ── STEP 2: Name Review ── -->
+  <div class="section" id="step-1">
+    <div class="card">
+      <div class="card-title">Review Organization Names</div>
+      <div class="card-subtitle" id="name-subtitle">Finding name clusters that may refer to the same organization...</div>
 
-<div class="toast" id="toast"></div>
+      <div id="name-notice" class="hidden"></div>
+      <div class="progress-text" id="name-progress-text"></div>
+      <div class="progress-bar"><div class="progress-fill" id="name-progress-fill" style="width:0%"></div></div>
+
+      <div class="cluster-search-bar hidden" id="cluster-search-bar">
+        <div class="cluster-search-wrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="cluster-search-input" id="cluster-search-input" type="text" placeholder="Search organizations..." oninput="clusterSearchInput(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();clusterSearchNext();}">
+        </div>
+        <button class="search-nav-btn" id="search-prev-btn" onclick="clusterSearchPrev()" disabled>&#8593;</button>
+        <button class="search-nav-btn" id="search-next-btn" onclick="clusterSearchNext()" disabled>&#8595;</button>
+        <span class="search-match-label" id="search-match-label"></span>
+      </div>
+
+      <div class="filter-bar hidden" id="cluster-filter-bar">
+        <span class="filter-label">Show:</span>
+        <button class="filter-pill active" onclick="setClusterFilter('all')">All</button>
+        <button class="filter-pill" onclick="setClusterFilter('unreviewed')">Unreviewed</button>
+        <button class="filter-pill" onclick="setClusterFilter('accepted')">Accepted</button>
+        <button class="filter-pill" onclick="setClusterFilter('skipped')">Skipped</button>
+      </div>
+
+      <div id="clusters-container"></div>
+
+      <div class="btn-row" id="name-btn-row" style="display:none">
+        <button class="btn btn-primary" onclick="goToStep(2)">Continue to Org Types →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: Org Type Conflicts ── -->
+  <div class="section" id="step-2">
+    <div class="card">
+      <div class="card-title">Resolve Org Type Conflicts</div>
+      <div class="card-subtitle">Some organizations have been tagged with different types by different respondents. Choose the correct type for each.</div>
+
+      <div id="type-notice" class="hidden"></div>
+      <div class="filter-bar hidden" id="type-filter-bar">
+        <span class="filter-label">Show:</span>
+        <button class="filter-pill active" onclick="setTypeFilter('all')">All</button>
+        <button class="filter-pill" onclick="setTypeFilter('unreviewed')">Unreviewed</button>
+        <button class="filter-pill" onclick="setTypeFilter('confirmed')">Confirmed</button>
+      </div>
+      <div id="type-conflicts-container"></div>
+
+      <div class="btn-row" id="type-btn-row">
+        <button class="btn btn-primary" onclick="goToStep(3)">Continue to Attributes →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 4: Attribute Conflicts ── -->
+  <div class="section" id="step-3">
+    <div class="card">
+      <div class="card-title">Review Attribute Conflicts</div>
+      <div class="card-subtitle">Some organizations appear multiple times with different counties, languages, or groups served. Review and confirm the correct values.</div>
+
+      <div id="attr-notice" class="hidden"></div>
+      <div class="filter-bar hidden" id="attr-filter-bar">
+        <span class="filter-label">Show:</span>
+        <button class="filter-pill active" onclick="setAttrFilter('all')">All</button>
+        <button class="filter-pill" onclick="setAttrFilter('unreviewed')">Unreviewed</button>
+        <button class="filter-pill" onclick="setAttrFilter('confirmed')">Confirmed</button>
+      </div>
+      <div id="attr-conflicts-container"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="goToStep(4)">Continue to Summary →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 5: Summary ── -->
+  <div class="section" id="step-4">
+    <div class="card">
+      <div class="card-title">Cleaning Summary</div>
+      <div class="card-subtitle">Here's what will be in your output files. Review before downloading.</div>
+
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-box">
+          <div class="stat-num" id="stat-orgs">—</div>
+          <div class="stat-label">Organizations</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-rels">—</div>
+          <div class="stat-label">Relationships</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-corrections">—</div>
+          <div class="stat-label">Name Corrections</div>
+        </div>
+      </div>
+
+      <div id="collab-breakdown"></div>
+      <div id="type-breakdown" class="mt16"></div>
+      <div id="warn-unmatched" class="hidden"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="goToStep(5)">Generate Files →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STEP 6: Download ── -->
+  <div class="section" id="step-5">
+    <div class="download-box">
+      <h3>Your files are ready</h3>
+      <p>Download the cleaned data for use with generate_report.py</p>
+
+      <div class="download-files">
+        <div class="download-file"><strong>orgs.csv</strong> Organizations table</div>
+        <div class="download-file"><strong>relationships.csv</strong> Network relationships</div>
+        <div class="download-file"><strong>corrections_log.csv</strong> Audit trail</div>
+        <div class="download-file"><strong id="canonical-filename-display">canonical_names.json</strong> Name registry</div>
+      </div>
+
+      <button class="btn btn-success" onclick="doDownload()" style="font-size:16px; padding:14px 36px;">
+        ⬇ Download Cleaned Files
+      </button>
+    </div>
+
+    <div class="card mt24">
+      <div style="font-size:14px; color:#666; line-height:1.7;">
+        <strong style="color:var(--forest)">What to do with these files:</strong><br>
+        1. Unzip the downloaded file<br>
+        2. Place <code>orgs.csv</code> and <code>relationships.csv</code> in your <code>Pando_report/data/<span id="dl-year">2024</span>/</code> folder<br>
+        3. Run <code>generate_report.py</code> as usual<br><br>
+        <strong style="color:var(--forest)">Note:</strong> Your <code>canonical_names.json</code> has been updated with all decisions made in this session. Next year's cleaning will auto-apply them.
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="startOver()">Start New Cleaning Session</button>
+    </div>
+  </div>
+
+</div><!-- /shell -->
+
+<!-- Loading overlay -->
+<div class="loading-overlay hidden" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">Processing...</div>
+</div>
 
 <script>
-// ── Config ────────────────────────────────────────────────────────────
-const SB_URL='https://qkedzkejcxurlbvgrejn.supabase.co';
-const SB_KEY='sb_publishable_A19b81BUorSUGg4mk3Rueg_2R9ld5PI';
-const AI_MODELS=['claude-sonnet-4-6','claude-3-haiku-20240307'];
-const db=supabase.createClient(SB_URL,SB_KEY);
+// State
+let currentStep = 0;
+let clusters = [];
+let clusterDecisions = {};
+let separatedNames = {};
+let typeConflicts = [];
+let typeDecisions = {};
+let attrConflicts = [];
+let attrDecisions = {};
+let clusterFilter = 'all';
+let typeFilter = 'all';
+let attrFilter = 'all';
+let searchMatches = [];
+let searchCursor = 0;
+let autosaveInterval = null;
+let autosaveEnabled = true;
+const AUTOSAVE_MS = 60000;
 
-// ── Palettes ──────────────────────────────────────────────────────────
-const AV=[['#B5D4F4','#0C447C'],['#9FE1CB','#085041'],['#FAC775','#633806'],['#CECBF6','#3C3489'],['#F5C4B3','#712B13'],['#C0DD97','#27500A'],['#F4C0D1','#72243E']];
-const TP=[{bg:'#E6F1FB',fg:'#185FA5'},{bg:'#E1F5EE',fg:'#0F6E56'},{bg:'#FAEEDA',fg:'#854F0B'},{bg:'#EEEDFE',fg:'#534AB7'},{bg:'#FAECE7',fg:'#993C1D'},{bg:'#EAF3DE',fg:'#3B6D11'},{bg:'#FBEAF0',fg:'#72243E'}];
-const PCOL={Evan:{bg:'#B5D4F4',fg:'#0C447C'},Beryl:{bg:'#9FE1CB',fg:'#085041'},Aaron:{bg:'#FAC775',fg:'#633806'}};
-function avC(n){return AV[(n||'A').charCodeAt(0)%AV.length];}
-function tpC(t){return TP[((t||'').charCodeAt(0)+(t||'').length)%TP.length];}
-function ini(n){return(n||'').trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase()||'?';}
-function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-// ── State ─────────────────────────────────────────────────────────────
-let contacts=[], currentId=null, activeTag='', addTargetCol='todo', currentTab='overview';
-let currentSource=localStorage.getItem('cf_source')||'Skoll World Forum';
-let currentBoard=localStorage.getItem('cf_board')||'Skoll World Forum'; // active board filter
-const scenarioMap={};
-const COLS=['todo','outreach','dialogue','done'];
-
-// ── Supabase helpers ──────────────────────────────────────────────────
-function toDb(c){
-  return{id:c.id,name:c.name||'',title:c.title||'',org:c.org||'',email:c.email||'',phone:c.phone||'',
-    description:c.description||'',issues:c.issues||[],tags:c.tags||[],assignees:c.assignees||[],
-    tasks:c.tasks||[],email_draft:c.emailDraft||'',source:c.source||'',status:c.status||'todo',
-    created_at:c.createdAt||new Date().toISOString(),updated_at:new Date().toISOString()};
+// Utility
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden'); }
+function $(id)    { return document.getElementById(id); }
+function loading(msg='Processing...') { $('loading-text').textContent = msg; $('loading').classList.remove('hidden'); }
+function doneLoading() { $('loading').classList.add('hidden'); }
+function notice(containerId, type, msg) {
+  const el = $(containerId);
+  el.className = 'notice notice-' + type;
+  el.innerHTML = msg;
+  el.classList.remove('hidden');
 }
-function fromDb(r){
-  return{id:r.id,name:r.name||'',title:r.title||'',org:r.org||'',email:r.email||'',phone:r.phone||'',
-    description:r.description||'',issues:r.issues||[],tags:r.tags||[],assignees:r.assignees||[],
-    tasks:r.tasks||[],emailDraft:r.email_draft||'',source:r.source||'Skoll World Forum',status:r.status||'todo',createdAt:r.created_at};
+async function api(url, opts) {
+  const r = await fetch(url, opts || {});
+  return r.json();
 }
-
-// ── Storage ───────────────────────────────────────────────────────────
-function cacheLocal(){try{localStorage.setItem('skoll_cfk',JSON.stringify(contacts));}catch{}}
-function getKey(){return localStorage.getItem('cf_api_key')||'';}
-
-async function load(){
-  setSyncStatus('syncing');
-  try{
-    const{data,error}=await db.from('contacts').select('*').order('created_at');
-    if(error)throw error;
-    if(!data.length){
-      // Truly empty DB — seed with demo data
-      contacts=getSkollData();
-      await db.from('contacts').upsert(contacts.map(toDb));
-    } else {
-      // Always use Supabase data — overwrite any local cache
-      contacts=data.map(fromDb);
-    }
-    cacheLocal(); // update cache with fresh data
-    setSyncStatus('saved');
-  }catch(err){
-    console.warn('Supabase load failed:',err.message);
-    // Only fall back to cache if Supabase completely unavailable
-    try{const d=localStorage.getItem('skoll_cfk');if(d)contacts=JSON.parse(d);}catch{}
-    setSyncStatus('offline');
+function escHtml(str) {
+  const s = String(str);
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if      (c === '&') out += '&amp;';
+    else if (c === '<') out += '&lt;';
+    else if (c === '>') out += '&gt;';
+    else if (c === '"') out += '&#34;';
+    else if (c === "'") out += '&#39;';
+    else out += c;
   }
+  return out;
 }
 
-async function syncOne(c){
-  cacheLocal();setSyncStatus('syncing');
-  try{
-    const{error}=await db.from('contacts').upsert(toDb(c));
-    if(error){
-      console.error('Sync error:',error);
-      setSyncStatus('offline');
-      toast('Save failed: '+error.message);
-      return;
-    }
-    setSyncStatus('saved');
-  }catch(err){
-    console.warn('Sync error:',err.message);
-    setSyncStatus('offline');
-    toast('Save failed: '+err.message);
-  }
-}
-
-async function deleteOne(id){
-  contacts=contacts.filter(c=>c.id!==id);cacheLocal();render();
-  try{await db.from('contacts').delete().eq('id',id);}catch{}
-}
-
-function setSyncStatus(s){
-  const el=document.getElementById('sync-status');if(!el)return;
-  const m={syncing:{t:'Syncing...',c:'#92400e',d:'#f59e0b'},saved:{t:'Saved',c:'#065f46',d:'#10b981'},offline:{t:'Offline',c:'#991b1b',d:'#ef4444'}};
-  const v=m[s]||m.saved;
-  el.innerHTML=`<span style="width:6px;height:6px;border-radius:50%;background:${v.d};display:inline-block;"></span><span style="color:${v.c};">${v.t}</span>`;
-}
-
-// ── Demo data ─────────────────────────────────────────────────────────
-function mkT(arr){return arr.map((t,i)=>({id:'t'+Date.now()+i+Math.random(),text:t,done:false,deadline:''}));}
-function getSkollData(){
-  const n=new Date().toISOString(),src='Skoll World Forum';
-  return [
-    {id:'c1',name:'Jamaica Maxwell',title:'',org:'',email:'',phone:'',description:'Democratic resilience follow-up.',issues:['Democratic resilience'],tags:['Democratic resilience'],assignees:['Evan'],tasks:mkT(['Follow up']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c2',name:'Shaheen',title:'',org:'Hilton',email:'',phone:'',description:'Democratic resilience follow-up.',issues:['Democratic resilience'],tags:['Democratic resilience'],assignees:['Evan'],tasks:mkT(['Follow up with Shaheen']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c3',name:'Sanjay',title:'',org:'',email:'',phone:'',description:'KX follow-up - schedule planning call.',issues:['KX planning call'],tags:['KX follow-up'],assignees:['Evan'],tasks:mkT(['Schedule planning call']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c4',name:'Dani',title:'',org:'',email:'',phone:'',description:'KX follow-up - schedule planning call.',issues:['KX planning call'],tags:['KX follow-up'],assignees:['Evan'],tasks:mkT(['Schedule planning call']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c5',name:'Erin Worsham',title:'',org:'Duke',email:'',phone:'',description:'Reference how much Beryl enjoyed conversation with her.',issues:['KX partnership'],tags:['KX follow-up'],assignees:['Evan'],tasks:mkT(['Send follow-up referencing Beryl']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c6',name:'Robert White',title:'',org:'',email:'',phone:'',description:'Share Google concept note (AI). Meet with Myson. Follow up on PDC training.',issues:['Google concept note (AI)','PDC training','Myson strategy'],tags:['Economic resilience','AI Policy'],assignees:['Evan'],tasks:mkT(['Share Google concept note (AI)','Meet and strategize with Myson','Follow up on PDC training for grantees']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c7',name:'Legado Foundation',title:'',org:'Legado Fdn',email:'',phone:'',description:'Follow-up with Majka (ED) and Katie Bernard (Head of Impact).',issues:['Impact partnership'],tags:['Economic resilience'],assignees:['Evan'],tasks:mkT(['Email Majka (ED)','Connect with Katie Bernard']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c8',name:'Woven Foundation',title:'Veronica Ksiazek',org:'Woven Fdn',email:'',phone:'',description:'Funding democracy resilience and community development.',issues:['Democracy resilience funding','Community development'],tags:['Economic resilience','Democratic resilience'],assignees:['Evan'],tasks:mkT(['Follow up with Veronica Ksiazek']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c9',name:'Sybil',title:'',org:'Gates Foundation',email:'',phone:'',description:'Message on LinkedIn.',issues:['Gates Foundation relationship'],tags:['Economic resilience'],assignees:['Evan'],tasks:mkT(['Message Sybil on LinkedIn']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c10',name:'IDS Research Team',title:'',org:'IDS',email:'',phone:'',description:'Follow up with research team.',issues:['Research collaboration'],tags:['Economic resilience'],assignees:['Evan'],tasks:mkT(['Follow up with IDS research team']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c11',name:'Dedo',title:'',org:'Segal Family Foundation',email:'',phone:'',description:'Segal Family Fdn follow-up.',issues:['Foundation partnership'],tags:['Economic resilience'],assignees:['Evan'],tasks:mkT(['Follow up with Dedo']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c12',name:'Peter (CPTA)',title:'',org:'CPTA',email:'',phone:'',description:'Concept note to Peter.',issues:['Concept note delivery','CPTA partnership'],tags:['Democratic resilience'],assignees:['Evan','Beryl'],tasks:mkT(['Finalize and send concept note to Peter']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c13',name:'TCC Contract Strategy',title:'',org:'',email:'',phone:'',description:'Develop strategy for next TCC contract.',issues:['TCC contract renewal'],tags:['Democratic resilience'],assignees:['Evan','Beryl'],tasks:mkT(['Develop strategy for next TCC contract']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c14',name:'Key Contacts - Webinar',title:'',org:'',email:'',phone:'',description:'Invite key contacts to webinar.',issues:['Webinar outreach'],tags:['Democratic resilience'],assignees:['Evan','Beryl','Aaron'],tasks:mkT(['Identify invitees','Send invitations']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c15',name:'LinkedIn Collateral',title:'',org:'',email:'',phone:'',description:'LinkedIn collateral for Skoll comms.',issues:['Post-Skoll comms'],tags:['Comms & branding'],assignees:['Evan','Beryl','Aaron'],tasks:mkT(['Draft LinkedIn collateral','Publish posts']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c16',name:'MacKinsie',title:'',org:'',email:'',phone:'',description:'Democratic resilience / CPTA follow-up.',issues:['CPTA partnership'],tags:['Democratic resilience'],assignees:['Beryl'],tasks:mkT(['Follow up with MacKinsie']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c17',name:'Vladimir',title:'',org:'',email:'',phone:'',description:'Democratic resilience / CPTA follow-up.',issues:['CPTA partnership'],tags:['Democratic resilience'],assignees:['Beryl'],tasks:mkT(['Follow up with Vladimir']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c18',name:'Matt Glazer',title:'',org:'',email:'',phone:'',description:'Democratic resilience / CPTA follow-up.',issues:['CPTA partnership'],tags:['Democratic resilience'],assignees:['Beryl'],tasks:mkT(['Follow up with Matt Glazer']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c19',name:'Celina (CPTA)',title:'',org:'',email:'',phone:'',description:'Democratic resilience / CPTA follow-up.',issues:['CPTA partnership'],tags:['Democratic resilience'],assignees:['Beryl'],tasks:mkT(['Follow up with Celina']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c20',name:'Rebecca Finlay',title:'',org:'Partnership for AI',email:'',phone:'',description:'Based in Toronto, travels to SF. KX follow-up re Partnership for AI.',issues:['Partnership for AI','KX collaboration'],tags:['KX follow-up','AI Policy'],assignees:['Beryl'],tasks:mkT(['Schedule intro call with Rebecca']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c21',name:'BWS Follow-up',title:'',org:'',email:'',phone:'',description:'Jennifer Cho (Panarama Global); Ruba and Lucy (Democracy Next).',issues:['BWS follow-up','Democracy Next'],tags:['Democratic resilience'],assignees:['Aaron'],tasks:mkT(['Follow up with Jennifer Cho','Follow up with Ruba and Lucy']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c22',name:'RAD Network Strategy',title:'',org:'',email:'',phone:'',description:'Develop RAD Network strategy.',issues:['RAD Network strategy'],tags:['Democratic resilience'],assignees:['Aaron'],tasks:mkT(['Develop RAD Network strategy']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c23',name:'Sidebar Session',title:'',org:'',email:'',phone:'',description:'Sidebar session follow-up from Skoll.',issues:['Skoll sidebar'],tags:['Democratic resilience'],assignees:['Aaron'],tasks:mkT(['Follow up on sidebar session']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c24',name:'Jonny Subash',title:'',org:'',email:'',phone:'',description:'Schedule demo. Share note sent to Sanjay.',issues:['KX demo','Sanjay note'],tags:['KX follow-up'],assignees:['Aaron'],tasks:mkT(['Schedule demo','Share note sent to Sanjay']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c25',name:'Guide to Good',title:'Courtney & Adam',org:'Guide to Good',email:'',phone:'',description:'Request demo.',issues:['KX demo request'],tags:['KX follow-up'],assignees:['Aaron'],tasks:mkT(['Request demo from Courtney and Adam']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c26',name:'Tarek',title:'',org:'',email:'',phone:'',description:'Explore digital passport concept.',issues:['Digital passport concept'],tags:['KX follow-up','Technology'],assignees:['Aaron'],tasks:mkT(['Explore digital passport concept']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c27',name:'Lindsay',title:'',org:'Gates Foundation',email:'',phone:'',description:'Share concept note. Get donor names from Gates.',issues:['Concept note','Gates donor network'],tags:['KX follow-up'],assignees:['Aaron'],tasks:mkT(['Share concept note','Get donor names from Gates']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c28',name:'Social Media Posts',title:'',org:'',email:'',phone:'',description:'Social media posts re Skoll.',issues:['Skoll social media'],tags:['Comms & branding'],assignees:['Aaron'],tasks:mkT(['Draft and publish social media posts']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c29',name:'Tara Wondraczek',title:'ED',org:'Family Foundation',email:'',phone:'',description:'Small family foundation. West Africa community economic development. Also supports Tostan.',issues:['West Africa development','Tostan relationship'],tags:['Economic resilience'],assignees:['Aaron'],tasks:mkT(['Send follow-up to Tara Wondraczek']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c30',name:'Aroa Alvarez',title:'',org:'',email:'',phone:'',description:'Intro to Possibility Lab. Follow-up on Nest offerings. Explore as back-end sponsor.',issues:['Possibility Lab intro','Nest fiscal sponsorship'],tags:['Fiscal sponsorship'],assignees:[],tasks:mkT(['Intro to Possibility Lab','Follow up on Nest offerings']),emailDraft:'',source:src,status:'todo',createdAt:n},
-    {id:'c31',name:'Celina (Nasdaq)',title:'',org:'Nasdaq',email:'',phone:'',description:'PDAT - People Doing Amazing Things (10 possibilities good to go).',issues:['PDAT partnership'],tags:['Fiscal sponsorship'],assignees:[],tasks:mkT(['Follow up on PDAT']),emailDraft:'',source:src,status:'todo',createdAt:n},
-  ];
-}
-
-// ── AI ────────────────────────────────────────────────────────────────
-async function callAI(sys,usr){
-  const key=getKey();
-  if(!key)throw new Error('No API key - click the key pill in the top bar');
-  let lastErr='';
-  for(const model of AI_MODELS){
-    try{
-      const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model,max_tokens:1024,system:sys,messages:[{role:'user',content:usr}]})});
-      let data;try{data=await r.json();}catch{lastErr=`Status ${r.status}`;continue;}
-      if(r.status===404){lastErr=`Model ${model} not available`;continue;}
-      if(!r.ok){lastErr=data?.error?.message||`Error ${r.status}`;continue;}
-      return data.content[0].text;
-    }catch(e){lastErr=e.message;}
-  }
-  throw new Error(lastErr||'AI call failed');
-}
-
-// ── Render board ──────────────────────────────────────────────────────
-function render(){
-  const q=(document.getElementById('search').value||'').toLowerCase();
-  renderBoardTabs();
-  COLS.forEach(col=>{
-    const el=document.getElementById('cards-'+col);
-    const items=contacts.filter(c=>{
-      if(c.status!==col)return false;
-      if(currentBoard&&c.source!==currentBoard)return false; // board filter
-      if(activeTag&&!(c.tags||[]).includes(activeTag))return false;
-      if(q&&![c.name,c.org,c.source].some(v=>(v||'').toLowerCase().includes(q)))return false;
-      return true;
-    });
-    el.innerHTML='';
-    items.forEach(c=>el.appendChild(buildCard(c)));
-    document.getElementById('cnt-'+col).textContent=items.length;
-  });
-  renderTagBar();
-  const tot=contacts.length,pen=contacts.reduce((n,c)=>n+(c.tasks||[]).filter(t=>!t.done).length,0);
-  document.getElementById('sbar').textContent=`${tot} contact${tot!==1?'s':''} - ${pen} pending task${pen!==1?'s':''}`;
-}
-
-function buildCard(c){
-  const[bg,fg]=avC(c.name);
-  const tasks=c.tasks||[];
-  const done=tasks.filter(t=>t.done).length;
-  const pct=tasks.length?Math.round(done/tasks.length*100):0;
-  const assignees=(c.assignees||[]).slice(0,3);
-
-  const card=document.createElement('div');
-  card.className='card';
-  card.dataset.id=c.id;
-
-  // Avatar
-  const av=document.createElement('div');
-  av.className='av';
-  Object.assign(av.style,{width:'32px',height:'32px',background:bg,color:fg,flexShrink:'0'});
-  av.textContent=ini(c.name);
-
-  // Meta
-  const meta=document.createElement('div');
-  meta.className='card-meta';
-  meta.innerHTML=`<div class="card-name">${esc(c.name)}</div><div class="card-sub">${esc([c.title,c.org].filter(Boolean).join(' - '))||'<span style="color:var(--text3)">-</span>'}</div>`;
-
-  // Top row
-  const top=document.createElement('div');
-  top.className='card-top';
-  top.appendChild(av);top.appendChild(meta);
-  card.appendChild(top);
-
-  // Tags
-  if((c.tags||[]).length){
-    const tagsDiv=document.createElement('div');tagsDiv.className='card-tags';
-    c.tags.slice(0,3).forEach(t=>{
-      const tc=tpC(t);const span=document.createElement('span');span.className='tag';
-      span.style.background=tc.bg;span.style.color=tc.fg;span.textContent=t;tagsDiv.appendChild(span);
-    });
-    if(c.tags.length>3){const s=document.createElement('span');s.style.cssText='font-size:10px;color:var(--text3);';s.textContent=`+${c.tags.length-3}`;tagsDiv.appendChild(s);}
-    card.appendChild(tagsDiv);
-  }
-
-  // Footer
-  const footer=document.createElement('div');footer.className='card-footer';
-  const adots=document.createElement('div');adots.className='assignee-dots';
-  if(assignees.length){
-    assignees.forEach(a=>{const pc=PCOL[a]||{bg:'#ddd',fg:'#555'};const d=document.createElement('div');d.className='assignee-dot';d.style.background=pc.bg;d.style.color=pc.fg;d.textContent=(a||'')[0];adots.appendChild(d);});
-  } else {
-    const s=document.createElement('span');s.style.cssText='font-size:10px;color:var(--text3);';s.textContent='Unassigned';adots.appendChild(s);
-  }
-  footer.appendChild(adots);
-  const taskInfo=document.createElement('span');
-  if(tasks.length){
-    taskInfo.innerHTML=`${done}/${tasks.length} <span class="prog-bar"><span class="prog-fill" style="width:${pct}%"></span></span>`;
-  } else {
-    taskInfo.style.color='var(--text3)';taskInfo.style.fontSize='11px';taskInfo.textContent='No tasks';
-  }
-  footer.appendChild(taskInfo);
-  if(c.source){const s=document.createElement('span');s.style.cssText='font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:var(--col);color:var(--text3);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';s.textContent=c.source;footer.appendChild(s);}
-  card.appendChild(footer);
-
-  // ── Events ──
-  card.addEventListener('pointerdown',e=>{
-    if(e.button!==0)return;
-    // Clear any stuck drag state first
-    if(dragState){
-      if(dragState.ghost)dragState.ghost.remove();
-      const prev=document.querySelector(`.card[data-id="${dragState.id}"]`);
-      if(prev)prev.style.opacity='';
-      document.querySelectorAll('.col-scroll').forEach(el=>el.style.overflowY='');
-      dragState=null;
-    }
-    try{card.setPointerCapture(e.pointerId);}catch{}
-    const rect=card.getBoundingClientRect();
-    const ghost=card.cloneNode(true);
-    ghost.style.cssText=`position:fixed;z-index:9999;width:${rect.width}px;opacity:.88;pointer-events:none;display:none;box-shadow:0 12px 32px rgba(0,0,0,.2);transform:rotate(2deg);transition:none;left:${rect.left}px;top:${rect.top}px;border-radius:10px;`;
-    document.body.appendChild(ghost);
-    dragState={id:c.id,ghost,card,startX:e.clientX,startY:e.clientY,offX:e.clientX-rect.left,offY:e.clientY-rect.top,moved:false};
-    e.preventDefault();
-  });
-
-  card.addEventListener('pointermove',e=>{
-    if(!dragState||dragState.id!==c.id)return;
-    const dx=e.clientX-dragState.startX,dy=e.clientY-dragState.startY;
-    if(!dragState.moved&&Math.sqrt(dx*dx+dy*dy)<5)return;
-    if(!dragState.moved){
-      dragState.moved=true;
-      dragState.ghost.style.display='block';
-      document.querySelectorAll('.col-scroll').forEach(el=>el.style.overflowY='hidden');
-      card.style.opacity='.3';
-    }
-    dragState.ghost.style.left=(e.clientX-dragState.offX)+'px';
-    dragState.ghost.style.top=(e.clientY-dragState.offY)+'px';
-    document.querySelectorAll('.col').forEach(col=>{
-      const r=col.getBoundingClientRect();
-      col.classList.toggle('drag-over',e.clientX>=r.left&&e.clientX<=r.right);
-    });
-  });
-
-  card.addEventListener('pointerup',e=>{
-    if(!dragState||dragState.id!==c.id)return;
-    const wasMoved=dragState.moved;
-    endDrag(e);
-    if(!wasMoved)openPanel(c.id);
-    e.stopPropagation();
-  });
-
-  card.addEventListener('pointercancel',()=>{
-    if(!dragState||dragState.id!==c.id)return;
-    if(dragState.ghost)dragState.ghost.remove();
-    card.style.opacity='';
-    document.querySelectorAll('.col-scroll').forEach(el=>el.style.overflowY='');
-    document.querySelectorAll('.col').forEach(col=>col.classList.remove('drag-over'));
-    dragState=null;
-  });
-
-  return card;
-}
-
-function renderTagBar(){
-  const boardContacts=currentBoard?contacts.filter(c=>c.source===currentBoard):contacts;
-  const allTags=[...new Set(boardContacts.flatMap(c=>c.tags||[]))].sort();
-  const bar=document.getElementById('tag-bar');
-  bar.innerHTML='';
-  const allBtn=document.createElement('button');allBtn.className='tf'+(activeTag===''?' active':'');allBtn.textContent='All';
-  allBtn.onclick=()=>{activeTag='';render();};bar.appendChild(allBtn);
-  allTags.forEach(t=>{
-    const btn=document.createElement('button');btn.className='tf'+(activeTag===t?' active':'');btn.textContent=t;
-    btn.onclick=()=>{activeTag=activeTag===t?'':t;render();};bar.appendChild(btn);
+// Step navigation
+function updateJumpNav(activeStep) {
+  const nav = document.getElementById('jump-nav');
+  if (activeStep >= 1) nav.classList.add('visible');
+  nav.querySelectorAll('.jump-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.jump) === activeStep);
   });
 }
 
-// ── Debug ─────────────────────────────────────────────────────────────
-let debugOn=false;
-function toggleDebug(){debugOn=!debugOn;document.getElementById('debug-panel').style.display=debugOn?'':'none';}
-function dbg(msg){if(!debugOn)return;const el=document.getElementById('debug-log');if(el){const line=document.createElement('div');line.textContent=new Date().toISOString().slice(11,23)+' '+msg;el.appendChild(line);el.scrollTop=el.scrollHeight;}console.log('[drag]',msg);}
+function goToStep(n) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-' + n).classList.add('active');
+  document.querySelectorAll('.step-dot').forEach((d,i) => {
+    d.classList.remove('active','done');
+    if (i < n) d.classList.add('done');
+    if (i === n) d.classList.add('active');
+    if (i < n) d.querySelector('.dot').innerHTML = '&#10003;';
+  });
+  currentStep = n;
+  updateJumpNav(n);
+  if (n === 1) loadClusters();
+  if (n === 2) loadTypeConflicts();
+  if (n === 3) loadAttrConflicts();
+  if (n === 4) loadSummary();
+  if (n === 5) { $('dl-year').textContent = $('survey-year').value; loadDownloadStep(); }
+  window.scrollTo({top:0, behavior:'smooth'});
+}
 
+async function jumpToStep(n) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-' + n).classList.add('active');
+  document.querySelectorAll('.step-dot').forEach((d,i) => {
+    d.classList.remove('active','done');
+    if (i < n) d.classList.add('done');
+    if (i === n) d.classList.add('active');
+    if (i < n) d.querySelector('.dot').innerHTML = '&#10003;';
+  });
+  currentStep = n;
+  updateJumpNav(n);
+  if (n === 1 && clusters.length === 0) loadClusters();
+  else if (n === 1 && clusters.length > 0) { renderClusters(); $('name-btn-row').style.display = 'flex'; }
+  if (n === 2 && typeConflicts.length === 0) loadTypeConflicts();
+  else if (n === 2 && typeConflicts.length > 0) renderTypeConflicts();
+  if (n === 3 && attrConflicts.length === 0) loadAttrConflicts();
+  else if (n === 3 && attrConflicts.length > 0) renderAttrConflicts();
+  if (n === 4) loadSummary();
+  if (n === 5) { $('dl-year').textContent = $('survey-year').value; }
+  window.scrollTo({top:0, behavior:'smooth'});
+}
 
-let dragState=null;
-
-function setupDragDrop(){} // no-op, drag is handled per-card via pointer events
-
-// Escape key cancels any stuck drag
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'&&dragState){
-    if(dragState.ghost)dragState.ghost.remove();
-    document.querySelectorAll('.col-scroll').forEach(el=>el.style.overflowY='');
-    document.querySelectorAll('.col').forEach(col=>col.classList.remove('drag-over'));
-    const orig=document.querySelector(`.card[data-id="${dragState.id}"]`);
-    if(orig)orig.style.opacity='';
-    dragState=null;
-  }
+document.getElementById('jump-nav').addEventListener('click', function(e) {
+  const btn = e.target.closest('.jump-btn');
+  if (!btn) return;
+  jumpToStep(parseInt(btn.dataset.jump));
 });
 
-function endDrag(e){
-  if(!dragState)return;
-  const state=dragState;
-  dragState=null;
+// Upload
+const fileInput  = $('file-input');
+const uploadZone = $('upload-zone');
 
-  if(state.ghost)state.ghost.remove();
-  document.querySelectorAll('.col-scroll').forEach(el=>el.style.overflowY='');
-  document.querySelectorAll('.col').forEach(col=>col.classList.remove('drag-over'));
-  const orig=document.querySelector(`.card[data-id="${state.id}"]`);
-  if(orig)orig.style.opacity='';
+fileInput.addEventListener('change', function() {
+  if (fileInput.files[0]) {
+    $('upload-filename').textContent = '&#128196; ' + fileInput.files[0].name;
+    show('upload-filename');
+    $('upload-btn').disabled = false;
+  }
+});
+uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); uploadZone.classList.add('drag'); });
+uploadZone.addEventListener('dragleave', function() { uploadZone.classList.remove('drag'); });
+uploadZone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  uploadZone.classList.remove('drag');
+  fileInput.files = e.dataTransfer.files;
+  fileInput.dispatchEvent(new Event('change'));
+});
 
-  if(!state.moved){dbg('endDrag: not moved, skip');return;}
+async function doUpload() {
+  const reviewer = $('reviewer-name').value.trim();
+  const year = $('survey-year').value;
+  if (!reviewer) { alert('Please enter your name.'); return; }
+  if (!fileInput.files[0]) { alert('Please choose a file.'); return; }
+  loading('Uploading and analysing survey data...');
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  fd.append('reviewer', reviewer);
+  fd.append('survey_year', year);
+  const res = await fetch('/api/upload', { method:'POST', body:fd });
+  const data = await res.json();
+  doneLoading();
+  if (data.error) { alert('Error: ' + data.error); return; }
+  showSaveBar();
+  goToStep(1);
+}
 
-  dbg('endDrag: cursor='+Math.round(e.clientX)+','+Math.round(e.clientY));
+// Name Clusters
+async function loadClusters() {
+  loading('Finding duplicate name clusters...');
+  const data = await api('/api/clusters');
+  doneLoading();
+  clusters = data.clusters;
+  if (clusters.length === 0) {
+    $('name-subtitle').textContent = 'No name conflicts found — all organization names are already resolved.';
+    $('clusters-container').innerHTML = '<div class="all-done-msg"><div class="checkmark">&#9989;</div><p>All names auto-resolved. Nothing to review.</p></div>';
+    $('name-btn-row').style.display = 'flex';
+    return;
+  }
+  $('name-subtitle').textContent = clusters.length + ' clusters found where different name variants may refer to the same organization.';
+  show('cluster-search-bar');
+  show('cluster-filter-bar');
+  renderClusters();
+  $('name-btn-row').style.display = 'flex';
+}
 
-  // Detect target column by X position only — columns are horizontal lanes
-  // so vertical position doesn't matter (short columns still accept drops)
-  let targetCol=null;
-  document.querySelectorAll('.col').forEach(col=>{
-    const r=col.getBoundingClientRect();
-    dbg('col '+col.dataset.col+' x='+Math.round(r.left)+'-'+Math.round(r.right));
-    if(e.clientX>=r.left&&e.clientX<=r.right){targetCol=col;dbg('HIT: '+col.dataset.col);}
+function renderClusters() {
+  const container = $('clusters-container');
+  updateNameProgress();
+  container.innerHTML = clusters.map(function(cluster, idx) {
+    const dec = clusterDecisions[idx];
+    const isResolved = dec && !dec.skipped;
+    const isSkipped  = dec && dec.skipped;
+    const recommended = cluster.recommended;
+    const sepSet = separatedNames[idx] || new Set();
+
+    if (clusterFilter === 'unreviewed' && (isResolved || isSkipped)) return '<div id="cluster-' + idx + '" style="display:none"></div>';
+    if (clusterFilter === 'accepted'   && !isResolved)                return '<div id="cluster-' + idx + '" style="display:none"></div>';
+    if (clusterFilter === 'skipped'    && !isSkipped)                 return '<div id="cluster-' + idx + '" style="display:none"></div>';
+
+    const namesHTML = cluster.names.map(function(n) {
+      const isSep = sepSet.has(n.name);
+      const isRec = n.name === recommended;
+      const keepBtn = (!isRec) ? '<button class="btn-keep-sep ' + (isSep ? 'active' : '') + '" data-cluster="' + idx + '" data-name="' + escHtml(n.name) + '">' + (isSep ? '&#8629; Include' : 'Keep Separate') + '</button>' : '';
+      const sepTag  = isSep ? '<span class="keep-sep-tag">SEPARATE</span>' : '';
+      return '<div class="name-item ' + (isRec ? 'recommended' : '') + ' ' + (isSep ? 'keep-sep' : '') + '">'
+        + '<span class="name-text">' + escHtml(n.name) + '</span>'
+        + '<span class="name-count">' + n.count + ' mention' + (n.count!==1?'s':'') + '</span>'
+        + (n.is_acronym ? '<span class="name-tag">ACRONYM</span>' : '')
+        + (isRec && !isSep ? '<span class="name-score" style="color:var(--fern)">&#9733; suggested</span>' : '')
+        + (!isRec && !isSep ? '<span class="name-score">' + n.score + '% match</span>' : '')
+        + sepTag + keepBtn
+        + '</div>';
+    }).join('');
+
+    const mergeCount = cluster.names.filter(function(n) { return n.name !== recommended && !sepSet.has(n.name); }).length;
+    const sepCount   = sepSet.size;
+    const sepMsg = (sepCount > 0)
+      ? '<div style="font-size:12px; color:var(--amber); margin-bottom:10px">&#9888;&#65039; ' + sepCount + ' org' + (sepCount!==1?'s':'') + ' marked separate &mdash; ' + mergeCount + ' will merge into the canonical name.</div>'
+      : '';
+
+    return '<div class="cluster-card ' + (isResolved?'resolved':'') + ' ' + (isSkipped?'skipped':'') + '" id="cluster-' + idx + '">'
+      + '<div class="cluster-header">'
+      + '<span class="cluster-num">Cluster ' + (idx+1) + ' of ' + clusters.length + '</span>'
+      + (isResolved ? '<span class="cluster-badge badge-resolved">&#10003; ' + escHtml(dec.canonical) + '</span>' : '')
+      + (isSkipped  ? '<span class="cluster-badge badge-skipped">Skipped</span>' : '')
+      + '</div>'
+      + '<div class="name-list">' + namesHTML + '</div>'
+      + sepMsg
+      + (!isResolved && !isSkipped ? '<div class="canonical-input-row"><div class="form-row"><label>Canonical Name</label><input type="text" id="canon-input-' + idx + '" value="' + escHtml(recommended) + '" placeholder="Confirm or type override"></div></div>'
+        + '<div class="btn-row" style="margin-top:12px"><button class="btn btn-success" onclick="acceptCluster(' + idx + ')">&#10003; Accept</button><button class="btn btn-ghost" onclick="skipCluster(' + idx + ')">Skip</button></div>' : '')
+      + (isResolved || isSkipped ? '<button class="btn btn-ghost" style="margin-top:12px; font-size:12px" onclick="undoCluster(' + idx + ')">Undo</button>' : '')
+      + '</div>';
+  }).join('');
+
+  // Attach Keep Separate listeners via delegation
+  $('clusters-container').addEventListener('click', handleKeepSep);
+}
+
+function handleKeepSep(e) {
+  const btn = e.target.closest('.btn-keep-sep');
+  if (!btn) return;
+  const idx  = parseInt(btn.dataset.cluster);
+  const name = btn.dataset.name;
+  if (!separatedNames[idx]) separatedNames[idx] = new Set();
+  if (separatedNames[idx].has(name)) separatedNames[idx].delete(name);
+  else separatedNames[idx].add(name);
+  renderClusters();
+}
+
+function updateNameProgress() {
+  const resolved = Object.values(clusterDecisions).filter(function(d){ return !d.skipped; }).length;
+  const total = clusters.length;
+  const pct = total ? Math.round(resolved/total*100) : 100;
+  $('name-progress-fill').style.width = pct + '%';
+  $('name-progress-text').textContent = resolved + ' of ' + total + ' clusters reviewed';
+}
+
+async function acceptCluster(idx) {
+  const canonical = $('canon-input-' + idx).value.trim();
+  if (!canonical) { alert('Please enter a canonical name.'); return; }
+  const separated = Array.from(separatedNames[idx] || new Set());
+  const res = await api('/api/clusters/decide', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({index: idx, canonical, separated})
   });
-  if(!targetCol){dbg('NO TARGET COL — outside board');return;}
-
-  const newStatus=targetCol.dataset.col;
-  const c=contacts.find(x=>x.id===state.id);
-  dbg('contact found:'+(!!c)+' currentStatus:'+(c?.status)+' newStatus:'+newStatus);
-  if(c&&c.status!==newStatus){
-    c.status=newStatus;syncOne(c);render();
-    if(currentId===state.id)document.getElementById('pstatus').value=newStatus;
-    toast('Moved to '+targetCol.querySelector('.col-title').textContent);
-    dbg('MOVED OK');
-  } else {
-    dbg('same col or contact not found');
+  if (res.ok) {
+    clusterDecisions[idx] = {canonical, skipped: false};
+    renderClusters();
+    saveNow(true);
   }
 }
 
-
-// ── Panel ─────────────────────────────────────────────────────────────
-function openPanel(id){
-  currentId=id;const c=contacts.find(x=>x.id===id);if(!c)return;
-  renderPanelHdr(c);
-  document.querySelectorAll('.ptab').forEach((b,i)=>b.classList.toggle('active',i===0));
-  currentTab='overview';
-  renderPanelBody();
-  document.getElementById('backdrop').classList.add('open');
-  document.getElementById('panel').classList.add('open');
+function skipCluster(idx) {
+  clusterDecisions[idx] = {skipped: true};
+  renderClusters();
 }
-function closePanel(){
-  // Save any unsaved field values before closing
-  if(currentId){
-    const updates={};
-    document.querySelectorAll('[data-f]').forEach(inp=>{
-      updates[inp.dataset.f]=inp.value;
-    });
-    if(Object.keys(updates).length)updC(updates);
+
+function undoCluster(idx) {
+  delete clusterDecisions[idx];
+  if (separatedNames[idx]) delete separatedNames[idx];
+  renderClusters();
+}
+
+// Search
+function clusterSearchInput(val) {
+  val = val.trim().toLowerCase();
+  clusters.forEach(function(_, idx) { const el = $('cluster-' + idx); if (el) el.classList.remove('search-highlight'); });
+  if (!val) { searchMatches = []; searchCursor = 0; $('search-match-label').textContent = ''; $('search-prev-btn').disabled = true; $('search-next-btn').disabled = true; return; }
+  searchMatches = [];
+  clusters.forEach(function(cluster, idx) {
+    const haystack = cluster.names.map(function(n){ return n.name.toLowerCase(); }).join(' ');
+    if (haystack.includes(val)) searchMatches.push(idx);
+  });
+  $('search-match-label').textContent = searchMatches.length ? '1 / ' + searchMatches.length : '0 results';
+  $('search-prev-btn').disabled = searchMatches.length < 2;
+  $('search-next-btn').disabled = searchMatches.length < 2;
+  if (searchMatches.length) { searchCursor = 0; scrollToMatch(); }
+}
+
+function scrollToMatch() {
+  if (!searchMatches.length) return;
+  const idx = searchMatches[searchCursor];
+  $('search-match-label').textContent = (searchCursor+1) + ' / ' + searchMatches.length;
+  clusters.forEach(function(_, i) { const el = $('cluster-' + i); if (el) el.classList.remove('search-highlight'); });
+  const el = $('cluster-' + idx);
+  if (el) { el.classList.add('search-highlight'); el.scrollIntoView({behavior:'smooth', block:'center'}); }
+}
+
+function clusterSearchNext() { if (!searchMatches.length) return; searchCursor = (searchCursor+1) % searchMatches.length; scrollToMatch(); }
+function clusterSearchPrev() { if (!searchMatches.length) return; searchCursor = (searchCursor - 1 + searchMatches.length) % searchMatches.length; scrollToMatch(); }
+
+// Filter pills
+function setClusterFilter(f) {
+  clusterFilter = f;
+  document.querySelectorAll('#cluster-filter-bar .filter-pill').forEach(function(p) { p.classList.toggle('active', p.textContent.toLowerCase() === f || (f==='all' && p.textContent.toLowerCase()==='all')); });
+  renderClusters();
+}
+
+function setTypeFilter(f) {
+  typeFilter = f;
+  document.querySelectorAll('#type-filter-bar .filter-pill').forEach(function(p) { p.classList.toggle('active', p.textContent.toLowerCase() === f || (f==='all' && p.textContent.toLowerCase()==='all')); });
+  renderTypeConflicts();
+}
+
+function setAttrFilter(f) {
+  attrFilter = f;
+  document.querySelectorAll('#attr-filter-bar .filter-pill').forEach(function(p) { p.classList.toggle('active', p.textContent.toLowerCase() === f || (f==='all' && p.textContent.toLowerCase()==='all')); });
+  renderAttrConflicts();
+}
+
+// Org Type Conflicts
+async function loadTypeConflicts() {
+  loading('Checking for org type conflicts...');
+  const data = await api('/api/type-conflicts');
+  doneLoading();
+  typeConflicts = data.conflicts;
+  if (typeConflicts.length === 0) {
+    notice('type-notice', 'success', '&#9989; No org type conflicts found.');
+    $('type-conflicts-container').innerHTML = '';
+    return;
   }
-  document.getElementById('backdrop').classList.remove('open');
-  document.getElementById('panel').classList.remove('open');
-  currentId=null;
-}
-function getC(){return contacts.find(x=>x.id===currentId);}
-function updC(ch){
-  const i=contacts.findIndex(x=>x.id===currentId);if(i<0){toast('Save error: no contact');return;}
-  Object.assign(contacts[i],ch);
-  syncOne(contacts[i]);
-  if(ch.status)document.getElementById('pstatus').value=ch.status;
-  if(ch.name||ch.title||ch.org)renderPanelHdr(contacts[i]);
-  // Delay render so it doesn't interrupt active input fields
-  clearTimeout(updC._timer);
-  updC._timer=setTimeout(()=>render(),300);
-}
-function renderPanelHdr(c){
-  const[bg,fg]=avC(c.name);
-  const av=document.getElementById('pav');av.style.background=bg;av.style.color=fg;av.textContent=ini(c.name);
-  document.getElementById('pname').textContent=c.name||'Unnamed';
-  document.getElementById('psub').textContent=[c.title,c.org].filter(Boolean).join(' - ')||'';
-  document.getElementById('pstatus').value=c.status||'todo';
-}
-function switchPTab(tab,btn){
-  document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');currentTab=tab;renderPanelBody();
-}
-function renderPanelBody(){
-  const c=getC();if(!c)return;
-  const body=document.getElementById('pbody');
-  if(currentTab==='overview')body.innerHTML=tmplOverview(c);
-  else if(currentTab==='issues')body.innerHTML=tmplIssues(c);
-  else if(currentTab==='tasks')body.innerHTML=tmplTasks(c);
-  else if(currentTab==='email')body.innerHTML=tmplEmail(c);
-  bindPanel();
+  notice('type-notice', 'warn', '&#9888;&#65039; ' + typeConflicts.length + ' organizations have conflicting org type assignments.');
+  show('type-filter-bar');
+  renderTypeConflicts();
 }
 
-// ── Panel templates ───────────────────────────────────────────────────
-function tmplOverview(c){
-  return`<div class="psec"><div class="g2" style="margin-bottom:10px;">
-    <div><label class="fl">Name</label><input data-f="name" type="text" value="${esc(c.name||'')}"></div>
-    <div><label class="fl">Title</label><input data-f="title" type="text" value="${esc(c.title||'')}"></div>
-    <div><label class="fl">Organization</label><input data-f="org" type="text" value="${esc(c.org||'')}"></div>
-    <div><label class="fl">Email</label><input data-f="email" type="email" value="${esc(c.email||'')}"></div>
-    <div><label class="fl">Phone</label><input data-f="phone" type="text" value="${esc(c.phone||'')}"></div>
-    <div><label class="fl">Event / Conference</label><input data-f="source" type="text" value="${esc(c.source||'')}"></div>
-  </div></div>
-  <div class="psec">
-    <div class="row" style="justify-content:space-between;margin-bottom:6px;">
-      <label class="fl" style="margin:0;">Meeting notes</label>
-      <button id="enrich-btn" style="font-size:11px;padding:4px 10px;color:var(--teal);border-color:var(--teal);background:var(--teal-bg);">AI Enrich ✦</button>
-    </div>
-    <textarea data-f="description" id="desc-field" rows="5">${esc(c.description||'')}</textarea>
-    <div id="enrich-loading" style="display:none;font-size:12px;color:var(--text3);margin-top:6px;text-align:center;">Enriching notes...</div>
-  </div>
-  <div class="psec"><label class="fl">Quick add task</label>
-    <div class="row"><input type="text" id="quick-task" placeholder="Add a task..." style="flex:1;"><button id="quick-task-btn">Add</button></div>
-  </div>
-  <div class="psec" style="border-top:none;padding-top:0;">
-    <button id="del-contact-btn" style="width:100%;justify-content:center;color:#b00;border-color:#fca5a5;background:#fee2e2;font-size:12px;">Delete contact</button>
-  </div>`;
+function renderTypeConflicts() {
+  const container = $('type-conflicts-container');
+  const VALID_TYPES = ['Community based organization','Government Institution','NGO','Other first responder (fire, police, etc)','Local emergency service office','Business','Religious Group','Foundation','Other'];
+  container.innerHTML = typeConflicts.map(function(c, idx) {
+    const decided = typeDecisions[c.org];
+    if (typeFilter === 'unreviewed' && decided) return '<div id="type-conflict-' + idx + '" style="display:none"></div>';
+    if (typeFilter === 'confirmed'  && !decided) return '<div id="type-conflict-' + idx + '" style="display:none"></div>';
+    const valRows = Object.entries(c.values).sort(function(a,b){ return b[1]-a[1]; }).map(function(entry) {
+      return '<div class="breakdown-row"><span class="breakdown-label">' + escHtml(entry[0]) + '</span><span class="breakdown-val">' + entry[1] + ' respondent' + (entry[1]!==1?'s':'') + '</span></div>';
+    }).join('');
+    const opts = VALID_TYPES.map(function(t) {
+      return '<option value="' + escHtml(t) + '" ' + ((decided||c.majority)===t?'selected':'') + '>' + escHtml(t) + '</option>';
+    }).join('');
+    return '<div class="conflict-card ' + (decided?'resolved':'') + '" id="type-conflict-' + idx + '">'
+      + '<div class="conflict-org">' + escHtml(c.org) + '</div>'
+      + '<div style="margin-bottom:12px; font-size:13px; color:#666">' + valRows + '</div>'
+      + '<div><label style="margin-bottom:8px">Select correct type:</label><select id="type-select-' + idx + '" onchange="setType(' + idx + ', this.value)">' + opts + '</select></div>'
+      + (decided ? '<div class="notice notice-success" style="margin-top:12px; padding:8px 12px">&#10003; Set to: ' + escHtml(decided) + '</div>' : '')
+      + '<div class="btn-row" style="margin-top:12px"><button class="btn btn-success" onclick="confirmType(' + idx + ')">&#10003; Confirm</button></div>'
+      + '</div>';
+  }).join('');
 }
 
-function tmplIssues(c){
-  const ic=(c.issues||[]).map(i=>`<span class="chip">${esc(i)}<button class="chip-x" data-ri="${esc(i)}">x</button></span>`).join('');
-  const tc=(c.tags||[]).map(t=>{const p=tpC(t);return`<span class="tag" style="background:${p.bg};color:${p.fg};gap:4px;">${esc(t)}<button class="chip-x" data-rt="${esc(t)}" style="color:${p.fg};">x</button></span>`;}).join('');
-  return`<div class="psec"><label class="fl">Key issues discussed</label>
-    <div class="chips-row" style="margin-bottom:8px;">${ic||'<span style="font-size:12px;color:var(--text3);">None yet</span>'}</div>
-    <div class="row"><input type="text" id="new-issue" placeholder="Add issue..." style="flex:1;"><button id="add-issue-btn">Add</button></div>
-  </div>
-  <div class="psec"><label class="fl">Thematic priorities</label>
-    <div class="chips-row" style="margin-bottom:8px;">${tc||'<span style="font-size:12px;color:var(--text3);">None yet</span>'}</div>
-    <div class="row"><input type="text" id="new-tag" placeholder="Add tag..." style="flex:1;"><button id="add-tag-btn">Add</button></div>
-  </div>`;
+function setType(idx, val) { typeDecisions[typeConflicts[idx].org] = val; }
+
+async function confirmType(idx) {
+  const org = typeConflicts[idx].org;
+  const val = $('type-select-' + idx).value;
+  const res = await api('/api/type-conflicts/decide', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({org, canonical_type: val})
+  });
+  if (res.ok) { typeDecisions[org] = val; renderTypeConflicts(); saveNow(true); }
 }
 
-function tmplTasks(c){
-  const tasks=c.tasks||[];
-  const pen=tasks.filter(t=>!t.done).length;
-  document.getElementById('ptab-tasks').textContent='Tasks ('+pen+')';
-  const rows=tasks.map(t=>`<div class="task-row">
-    <input type="checkbox" class="tcheck" data-tid="${t.id}" ${t.done?'checked':''}>
-    <div style="flex:1;min-width:0;"><div style="font-size:13px;text-decoration:${t.done?'line-through':'none'};opacity:${t.done?.5:1};">${esc(t.text)}</div>
-    ${t.deadline?`<div style="font-size:11px;color:var(--text3);margin-top:2px;">Due ${t.deadline}</div>`:''}</div>
-    <button class="icon-btn" data-dt="${t.id}">x</button>
-  </div>`).join('');
-  return`<div class="psec">${!tasks.length?'<div style="text-align:center;padding:24px 0;color:var(--text3);font-size:13px;">No tasks yet</div>':'<div>'+rows+'</div>'}</div>
-  <div class="psec"><label class="fl">Add task</label>
-    <div class="row" style="flex-wrap:wrap;gap:8px;">
-      <input type="text" id="new-task" placeholder="Task description..." style="flex:1;min-width:140px;">
-      <input type="date" id="new-date" style="width:145px;flex-shrink:0;">
-      <button id="add-task-btn">Add</button>
-    </div>
-  </div>`;
+// Attribute Conflicts
+async function loadAttrConflicts() {
+  loading('Checking for attribute conflicts...');
+  const data = await api('/api/attr-conflicts');
+  doneLoading();
+  attrConflicts = data.conflicts;
+  if (attrConflicts.length === 0) {
+    notice('attr-notice', 'success', '&#9989; No attribute conflicts found.');
+    $('attr-conflicts-container').innerHTML = '';
+    return;
+  }
+  notice('attr-notice', 'warn', '&#9888;&#65039; ' + attrConflicts.length + ' attribute conflicts found. Select all values to keep.');
+  show('attr-filter-bar');
+  renderAttrConflicts();
 }
 
-function tmplEmail(c){
-  const has=!!c.emailDraft;
-  const sel=scenarioMap[c.id]||'nicetomeet';
-  const opts=[
-    {id:'nicetomeet',label:'Nice to Meet You',desc:'First-touch, light and warm'},
-    {id:'substantive',label:'Substantive Follow-Up',desc:'Deeper convo, sharing a resource'},
-    {id:'continuing',label:'Continuing the Conversation',desc:'Already been back-and-forth'},
-  ];
-  const radioHtml=opts.map(o=>`<div class="scenario-opt${sel===o.id?' sel':''}" id="sopt-${o.id}" data-scenario="${o.id}">
-    <div>
-      <div style="font-size:13px;font-weight:600;color:var(--text);">${o.label}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:1px;">${o.desc}</div>
-    </div>
-  </div>`).join('');
-  return`<div class="psec">
-    <label class="fl">Email type</label>
-    <div style="margin-bottom:14px;">${radioHtml}</div>
-    <div class="row" style="justify-content:space-between;margin-bottom:12px;">
-      <label class="fl" style="margin:0;">Draft</label>
-      <button class="primary" id="gen-btn" style="font-size:12px;padding:6px 12px;">${has?'Regenerate':'Generate with AI'}</button>
-    </div>
-    ${!has?`<div style="background:var(--col);border-radius:8px;padding:12px 14px;border:1px solid var(--border);font-size:13px;color:var(--text2);">Select an email type above, then generate a draft for <strong>${esc((c.name||'').split(' ')[0])}</strong>.</div>`:''}
-    <div id="email-loading" style="display:none;text-align:center;padding:24px;"><div class="spinner"></div><div style="font-size:13px;color:var(--text2);">Writing...</div></div>
-    ${has?`${c.email?`<div style="font-size:11px;color:var(--text3);margin-bottom:5px;font-family:monospace;">To: ${esc(c.email)}</div>`:''}
-    <textarea id="email-text" rows="9" style="font-size:13px;line-height:1.7;">${esc(c.emailDraft)}</textarea>
-    <div style="margin-top:8px;display:flex;gap:8px;">
-      <button id="copy-email-btn" style="font-size:12px;">Copy</button>
-      ${c.email?`<a href="mailto:${esc(c.email)}?body=${encodeURIComponent(c.emailDraft)}" style="font-size:12px;padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);text-decoration:none;display:inline-flex;align-items:center;">Open in mail</a>`:''}
-    </div>`:''}
-  </div>`;
+function renderAttrConflicts() {
+  const container = $('attr-conflicts-container');
+  const ATTR_LABELS = {counties_served:'Counties Served', lang_served:'Languages Served', groups_served:'Groups Served', racial_communities:'Racial Communities'};
+  container.innerHTML = attrConflicts.map(function(c, idx) {
+    const key = c.attribute + '::' + c.org;
+    const decided = attrDecisions[key] || [];
+    if (attrFilter === 'unreviewed' && decided.length) return '<div id="attr-conflict-' + idx + '" style="display:none"></div>';
+    if (attrFilter === 'confirmed'  && !decided.length) return '<div id="attr-conflict-' + idx + '" style="display:none"></div>';
+    const attrLabel = ATTR_LABELS[c.attribute] || c.attribute;
+    const optionsHTML = c.all_values.map(function(v) {
+      return '<div class="value-option ' + (decided.includes(v)?'selected':'') + '" onclick="toggleAttrValue(' + idx + ', &#39;' + escHtml(v) + '&#39;)">' + escHtml(v) + '</div>';
+    }).join('');
+    return '<div class="conflict-card ' + (decided.length?'resolved':'') + '" id="attr-conflict-' + idx + '">'
+      + '<div class="conflict-org">' + escHtml(c.org) + '</div>'
+      + '<div class="conflict-attr">' + attrLabel + ' &mdash; ' + c.response_count + ' response(s) with differing values</div>'
+      + '<div class="value-options" id="attr-opts-' + idx + '">' + optionsHTML + '</div>'
+      + '<div class="btn-row" style="margin-top:4px"><button class="btn btn-success" onclick="confirmAttr(' + idx + ')">&#10003; Confirm Selection</button><button class="btn btn-ghost" onclick="selectAllAttr(' + idx + ')">Select All</button></div>'
+      + (decided.length ? '<div class="notice notice-success" style="margin-top:12px; padding:8px 12px">&#10003; ' + decided.length + ' value' + (decided.length!==1?'s':'') + ' confirmed</div>' : '')
+      + '</div>';
+  }).join('');
 }
 
-// ── Panel bind ────────────────────────────────────────────────────────
-function bindPanel(){
-  // Save fields on blur AND input for textarea
-  document.querySelectorAll('[data-f]').forEach(inp=>{
-    inp.addEventListener('blur',()=>{updC({[inp.dataset.f]:inp.value});});
-    // Also save textarea on input with debounce so every keystroke eventually saves
-    if(inp.tagName==='TEXTAREA'){
-      let timer;
-      inp.addEventListener('input',()=>{
-        clearTimeout(timer);
-        timer=setTimeout(()=>updC({[inp.dataset.f]:inp.value}),800);
-      });
+function toggleAttrValue(idx, val) {
+  const key = attrConflicts[idx].attribute + '::' + attrConflicts[idx].org;
+  if (!attrDecisions[key]) attrDecisions[key] = [];
+  const i = attrDecisions[key].indexOf(val);
+  if (i > -1) attrDecisions[key].splice(i, 1);
+  else attrDecisions[key].push(val);
+  renderAttrConflicts();
+}
+
+async function confirmAttr(idx) {
+  const c = attrConflicts[idx];
+  const key = c.attribute + '::' + c.org;
+  const keep = attrDecisions[key] || [];
+  const res = await api('/api/attr-conflicts/decide', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({key, keep_values: keep})
+  });
+  if (res.ok) { renderAttrConflicts(); saveNow(true); }
+}
+
+function selectAllAttr(idx) {
+  const c = attrConflicts[idx];
+  attrDecisions[c.attribute + '::' + c.org] = c.all_values.slice();
+  renderAttrConflicts();
+}
+
+// Summary
+async function loadSummary() {
+  loading('Building output files...');
+  const data = await api('/api/summary');
+  doneLoading();
+  $('stat-orgs').textContent = data.orgs_count.toLocaleString();
+  $('stat-rels').textContent = data.rels_count.toLocaleString();
+  $('stat-corrections').textContent = data.name_corrections.toLocaleString();
+  const collabRows = Object.entries(data.collab_areas).sort(function(a,b){ return b[1]-a[1]; }).map(function(e) {
+    return '<div class="breakdown-row"><span class="breakdown-label">' + escHtml(e[0]) + '</span><span class="breakdown-val">' + e[1].toLocaleString() + ' relationships</span></div>';
+  }).join('');
+  $('collab-breakdown').innerHTML = '<div style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--fern); margin-bottom:8px">Relationships by Collaboration Area</div>' + collabRows;
+  const typeRows = Object.entries(data.org_types).sort(function(a,b){ return b[1]-a[1]; }).map(function(e) {
+    return '<div class="breakdown-row"><span class="breakdown-label">' + escHtml(e[0]) + '</span><span class="breakdown-val">' + e[1].toLocaleString() + ' orgs</span></div>';
+  }).join('');
+  $('type-breakdown').innerHTML = '<div style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--fern); margin-bottom:8px; margin-top:16px">Organizations by Type</div>' + typeRows;
+  if (data.unmatched_endpoints > 0) {
+    const warn = $('warn-unmatched');
+    warn.className = 'notice notice-warn';
+    warn.innerHTML = '&#9888;&#65039; ' + data.unmatched_endpoints + ' organizations appear in relationships but not in the orgs table.';
+    warn.classList.remove('hidden');
+  }
+}
+
+// Download
+async function doDownload() {
+  loading('Packaging files...');
+  const res = await fetch('/api/download');
+  doneLoading();
+  if (!res.ok) { alert('Error generating files.'); return; }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'pando_cleaned_' + $('survey-year').value + '.zip';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function loadDownloadStep() {
+  try {
+    const data = await api('/api/status');
+    if (data.canonical_filename) {
+      const el = $('canonical-filename-display');
+      if (el) el.textContent = data.canonical_filename;
     }
-  });
-  // Enrich notes button
-  const enrichBtn=document.getElementById('enrich-btn');
-  if(enrichBtn)enrichBtn.onclick=enrichNotes;
-  // Issues/tags remove
-  document.querySelectorAll('[data-ri]').forEach(b=>{
-    b.onclick=()=>{const c=getC();c.issues=(c.issues||[]).filter(i=>i!==b.dataset.ri);updC({issues:c.issues});renderPanelBody();};
-  });
-  document.querySelectorAll('[data-rt]').forEach(b=>{
-    b.onclick=()=>{const c=getC();c.tags=(c.tags||[]).filter(t=>t!==b.dataset.rt);updC({tags:c.tags});renderPanelBody();};
-  });
-  // Tasks
-  document.querySelectorAll('[data-tid]').forEach(cb=>{
-    cb.onchange=()=>{const c=getC();c.tasks=c.tasks.map(t=>t.id===cb.dataset.tid?{...t,done:cb.checked}:t);updC({tasks:c.tasks});renderPanelBody();};
-  });
-  document.querySelectorAll('[data-dt]').forEach(b=>{
-    b.onclick=()=>{const c=getC();c.tasks=(c.tasks||[]).filter(t=>t.id!==b.dataset.dt);updC({tasks:c.tasks});renderPanelBody();};
-  });
-  // Email
-  const et=document.getElementById('email-text');if(et)et.oninput=()=>updC({emailDraft:et.value});
-  const genBtn=document.getElementById('gen-btn');if(genBtn)genBtn.onclick=genEmail;
-  const copyBtn=document.getElementById('copy-email-btn');if(copyBtn)copyBtn.onclick=copyEmail;
-  // Quick task / add task
-  const addTaskBtn=document.getElementById('add-task-btn');if(addTaskBtn)addTaskBtn.onclick=addTask;
-  const quickTaskBtn=document.getElementById('quick-task-btn');if(quickTaskBtn)quickTaskBtn.onclick=quickTask;
-  // Delete
-  const delBtn=document.getElementById('del-contact-btn');if(delBtn)delBtn.onclick=delContact;
-  // Issues/tags add buttons
-  const addIssueBtn=document.getElementById('add-issue-btn');if(addIssueBtn)addIssueBtn.onclick=addIssue;
-  const addTagBtn=document.getElementById('add-tag-btn');if(addTagBtn)addTagBtn.onclick=addTag2;
-  // Scenario opts
-  document.querySelectorAll('.scenario-opt').forEach(el=>{
-    el.onclick=()=>pickScenario(el.dataset.scenario);
-  });
-  // Enter key shortcuts
-  ['new-issue','new-tag','new-task','quick-task'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(!el)return;
-    el.onkeydown=e=>{if(e.key==='Enter'){
-      if(id==='new-issue')addIssue();
-      else if(id==='new-tag')addTag2();
-      else if(id==='new-task')addTask();
-      else if(id==='quick-task')quickTask();
-    }};
-  });
+  } catch(e) {}
 }
 
-function addIssue(){const inp=document.getElementById('new-issue');const v=inp?.value.trim();if(!v)return;const c=getC();if(!(c.issues||[]).includes(v)){c.issues=[...(c.issues||[]),v];updC({issues:c.issues});}inp.value='';renderPanelBody();}
-function addTag2(){const inp=document.getElementById('new-tag');const v=inp?.value.trim();if(!v)return;const c=getC();if(!(c.tags||[]).includes(v)){c.tags=[...(c.tags||[]),v];updC({tags:c.tags});}inp.value='';renderPanelBody();}
-function addTask(){const t=document.getElementById('new-task')?.value.trim();if(!t)return;const c=getC();c.tasks=[...(c.tasks||[]),{id:'t'+Date.now(),text:t,deadline:document.getElementById('new-date')?.value||'',done:false}];updC({tasks:c.tasks});renderPanelBody();}
-function quickTask(){const inp=document.getElementById('quick-task');const v=inp?.value.trim();if(!v)return;const c=getC();c.tasks=[...(c.tasks||[]),{id:'t'+Date.now(),text:v,deadline:'',done:false}];updC({tasks:c.tasks});inp.value='';renderPanelBody();}
-function delContact(){if(!confirm('Delete this contact?'))return;const id=currentId;closePanel();deleteOne(id);toast('Deleted');}
-
-function pickScenario(s){
-  if(!currentId)return;
-  scenarioMap[currentId]=s;
-  document.querySelectorAll('.scenario-opt').forEach(el=>el.classList.remove('sel'));
-  const el=document.getElementById('sopt-'+s);if(el)el.classList.add('sel');
+function startOver() {
+  stopAutosave();
+  location.reload();
 }
 
-async function enrichNotes(){
-  const c=getC();
-  if(!c){toast('No contact selected');return;}
-  const btn=document.getElementById('enrich-btn');if(btn)btn.disabled=true;
-  const loading=document.getElementById('enrich-loading');
-  if(loading){loading.style.display='block';loading.style.color='var(--text3)';loading.textContent='Enriching notes...';}
-  const field=document.getElementById('desc-field');
-  const current=(field?field.value:null)||c.description||'';
-  if(!current.trim()){
-    if(loading)loading.style.display='none';
-    if(btn)btn.disabled=false;
-    toast('Add some notes first');return;
-  }
-  try{
-    const enriched=await callAI(
-      'You are a professional relationship manager helping structure conference contact notes.' +
-      ' Transform the raw notes into a clean structured format. Use only these plain-text section headers in ALL CAPS, and only include a section if there is actual content for it:' +
-      ' BACKGROUND: Who they are, role and organization.' +
-      ' CONTEXT: How and where we met, what was discussed.' +
-      ' OPPORTUNITY: Key opportunity, shared interest, or potential collaboration.' +
-      ' THEIR INTEREST: What they expressed interest in or excitement about.' +
-      ' NEXT STEPS: Numbered list of concrete follow-up actions.' +
-      ' Rules: Plain text only. No asterisks, no dashes, no markdown. Numbers for next steps (1. 2. 3.). 1-3 sentences per section max. Preserve every specific name, organization, and detail exactly as written. Do not add anything not in the notes. Return only the structured notes with no preamble or explanation.',
-      'Contact: ' + c.name + '\nTitle/Org: ' + ([c.title,c.org].filter(Boolean).join(', ')||'unknown') + '\nEvent: ' + (c.source||'conference') + '\nIssues: ' + ((c.issues||[]).join('; ')||'none') + '\nThemes: ' + ((c.tags||[]).join(', ')||'none') + '\nRaw notes: ' + current
-    );
-    if(field)field.value=enriched;
-    updC({description:enriched});
-    if(loading)loading.style.display='none';
-    toast('Notes enriched');
-  }catch(e){
-    console.error('Enrich error:',e);
-    if(loading){loading.textContent='Could not enrich: '+e.message;loading.style.color='#c00';}
-    setTimeout(()=>{if(loading)loading.style.display='none';},4000);
-  }
-  if(btn)btn.disabled=false;
+// Save bar
+function showSaveBar() {
+  $('save-bar').classList.add('visible');
+  $('autosave-track').classList.add('on');
+  startAutosave();
+  setSaveStatus('', 'Autosave on');
 }
 
-const MODEL_EMAIL_EXAMPLE = `Subject: Great meeting you at Skoll
+function setSaveStatus(type, msg) {
+  const el = $('save-status');
+  el.className = 'save-status' + (type ? ' ' + type : '');
+  el.textContent = msg;
+}
 
-Erin,
+function startAutosave() { stopAutosave(); autosaveInterval = setInterval(function(){ saveNow(true); }, AUTOSAVE_MS); }
+function stopAutosave()  { if (autosaveInterval) { clearInterval(autosaveInterval); autosaveInterval = null; } }
 
-It was a real pleasure meeting you at the Center for Exponential Change breakfast at Skoll. Beryl also enjoyed her conversation with you and came away energized by the exchange.
+function toggleAutosave() {
+  autosaveEnabled = !autosaveEnabled;
+  $('autosave-track').classList.toggle('on', autosaveEnabled);
+  if (autosaveEnabled) { startAutosave(); setSaveStatus('', 'Autosave on'); }
+  else { stopAutosave(); setSaveStatus('', 'Autosave off'); }
+}
 
-I was glad we discovered the North Carolina connection as well. Our son lives in the Triangle, so we find ourselves there more often than you might expect.
-
-As you settle back in and continue reflecting on ideas from the Forum, I would welcome the chance to hear how your thinking evolves around the KX partnership and whether there may be natural points of connection with your work. And if an in-person conversation makes sense during a future visit, I would be glad to make that happen.
-
-No rush — I simply wanted to keep the thread open and say how much I appreciated the chance to connect.
-
-Best, Evan`;
-
-const EMAIL_STYLE_GUIDE = 'Write in a warm, natural, professional voice. Avoid overly polished, generic, or AI-sounding language. The tone should feel thoughtful and human, but not gushy. Keep the email concise, usually 2-4 short paragraphs. Open by referencing the specific place or context where we met. Include one genuine personal or relational detail only if one is present in the notes — if there is no personal detail, skip it entirely. Connect naturally to the professional topic without overstating the opportunity. Avoid hard selling, exaggerated enthusiasm, or phrases like "excited to explore synergies," "it was truly inspiring," "the right people finding each other," or "circle back." End lightly, with an open invitation and no pressure. Make it sound like a real person wrote it. No subject line. Sign off: Best, Evan.';
-
-async function genEmail(){
-  const c=getC();const scenario=scenarioMap[c.id]||'nicetomeet';
-  const btn=document.getElementById('gen-btn');if(btn)btn.disabled=true;
-  const loading=document.getElementById('email-loading');if(loading)loading.style.display='';
-
-  const ctx='Contact: '+c.name+'\nTitle/Org: '+([c.title,c.org].filter(Boolean).join(', ')||'unknown')+'\nEmail: '+(c.email||'n/a')+'\nIssues discussed: '+((c.issues||[]).join('; ')||'none')+'\nThemes: '+((c.tags||[]).join(', ')||'none')+'\nMeeting notes: '+(c.description||'none')+'\nConference/event: '+(c.source||currentSource||'conference');
-
-  const intros={
-    nicetomeet:'This is a first follow-up after meeting at a conference or event.',
-    substantive:'This follows a more substantive conversation. There may be a resource, idea, or next step to reference.',
-    continuing:'This continues an ongoing exchange that has already had some back-and-forth.'
+function buildProgressPayload() {
+  const sepArr = {};
+  Object.entries(separatedNames).forEach(function(e) { sepArr[e[0]] = Array.from(e[1]); });
+  return {
+    step: currentStep,
+    year: $('survey-year').value,
+    reviewer: $('reviewer-name').value.trim(),
+    clusterDecisions, separatedNames: sepArr,
+    typeDecisions, attrDecisions,
+    clusterFilter, typeFilter, attrFilter,
+    savedAt: new Date().toISOString()
   };
-
-  const sys='You are helping Evan from Root Change write a follow-up email after meeting someone at a conference or event. ' +
-    intros[scenario] + ' ' + EMAIL_STYLE_GUIDE +
-    '\n\nHere is a model email that shows the right tone and style. Match this voice closely:\n\n' + MODEL_EMAIL_EXAMPLE;
-
-  try{
-    const email=await callAI(sys,ctx);
-    updC({emailDraft:email});
-  }catch(e){toast('Error: '+e.message);}
-  renderPanelBody();
 }
-function copyEmail(){const t=document.getElementById('email-text')?.value;if(t)navigator.clipboard.writeText(t).then(()=>toast('Copied!'));}
 
-// ── Add contact ───────────────────────────────────────────────────────
-let tmp={};
-function openAdd(col='todo'){addTargetCol=col;tmp={issues:[],tags:[],assignees:[],source:currentBoard||currentSource,_step:'input'};renderAdd();document.getElementById('add-modal').classList.add('open');}
-function closeAdd(){document.getElementById('add-modal').classList.remove('open');}
-function renderAdd(){
-  const body=document.getElementById('add-body');
-  if(tmp._step==='input'){
-    body.innerHTML=`<p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Describe who you met - AI will extract the details - or fill in manually.</p>
-    <label class="fl">Meeting notes</label>
-    <textarea id="add-desc" rows="5" placeholder='e.g. "Met Sarah Chen at the Skoll Forum - VP of Policy at GreenFund. Discussed carbon markets. sarah@greenfund.org"' style="margin-bottom:12px;"></textarea>
-    <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button onclick="skipManual()">Fill in manually</button>
-      <button class="primary" id="ext-btn" onclick="extractC()">Extract with AI</button>
-    </div>`;
-  } else if(tmp._step==='parsing'){
-    body.innerHTML=`<div style="text-align:center;padding:32px;"><div class="spinner"></div><div style="font-size:14px;font-weight:500;">Extracting...</div></div>`;
-  } else {
-    const ic=(tmp.issues||[]).map(i=>`<span class="chip">${esc(i)}<button class="chip-x" onclick="rmAdd('issues','${esc(i)}')">x</button></span>`).join('');
-    const tc=(tmp.tags||[]).map(t=>{const p=tpC(t);return`<span class="tag" style="background:${p.bg};color:${p.fg};gap:4px;">${esc(t)}<button class="chip-x" onclick="rmAdd('tags','${esc(t)}')" style="color:${p.fg};">x</button></span>`;}).join('');
-    body.innerHTML=`<div class="g2" style="margin-bottom:12px;">
-      <div><label class="fl">Name *</label><input id="af-name" type="text" value="${esc(tmp.name||'')}"></div>
-      <div><label class="fl">Title</label><input id="af-title" type="text" value="${esc(tmp.title||'')}"></div>
-      <div><label class="fl">Organization</label><input id="af-org" type="text" value="${esc(tmp.org||'')}"></div>
-      <div><label class="fl">Email</label><input id="af-email" type="email" value="${esc(tmp.email||'')}"></div>
-      <div><label class="fl">Phone</label><input id="af-phone" type="text" value="${esc(tmp.phone||'')}"></div>
-      <div><label class="fl">Event / Conference</label><input id="af-source" type="text" value="${esc(tmp.source||currentSource||'')}"></div>
-    </div>
-    <div class="divider"></div>
-    <label class="fl">Issues</label>
-    <div class="chips-row" style="margin-bottom:7px;">${ic||'<span style="font-size:12px;color:var(--text3);">None</span>'}</div>
-    <div class="row" style="margin-bottom:12px;"><input type="text" id="ai-inp" placeholder="Add issue..." style="flex:1;" onkeydown="if(event.key==='Enter')addAdd('issues')"><button onclick="addAdd('issues')">Add</button></div>
-    <label class="fl">Thematic priorities</label>
-    <div class="chips-row" style="margin-bottom:7px;">${tc||'<span style="font-size:12px;color:var(--text3);">None</span>'}</div>
-    <div class="row"><input type="text" id="at-inp" placeholder="Add tag..." style="flex:1;" onkeydown="if(event.key==='Enter')addAdd('tags')"><button onclick="addAdd('tags')">Add</button></div>
-    <div class="modal-foot" style="margin:16px -22px -18px;padding:12px 22px;">
-      <button onclick="tmp._step='input';renderAdd();">Back</button>
-      <button class="primary" onclick="saveNew()">Save contact</button>
-    </div>`;
+async function saveNow(silent) {
+  if (!silent) setSaveStatus('saving', 'Saving...');
+  try {
+    await fetch('/api/save-progress', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(buildProgressPayload())
+    });
+    const t = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    setSaveStatus('saved', 'Saved ' + t);
+  } catch(e) {
+    if (!silent) setSaveStatus('error', 'Save failed');
   }
 }
-function skipManual(){tmp={issues:[],tags:[],assignees:[],source:currentBoard||currentSource,_step:'form'};renderAdd();}
-async function extractC(){
-  const desc=document.getElementById('add-desc')?.value.trim();if(!desc)return;
-  tmp._desc=desc;tmp._step='parsing';renderAdd();
-  try{
-    const raw=await callAI('Extract conference contact info. Return ONLY valid JSON:\n{"name":"","title":"","org":"","email":"","phone":"","issues":[],"tags":[]}\nissues=specific topics (max 6). tags=broad themes (max 6).',desc);
-    Object.assign(tmp,JSON.parse(raw.replace(/```json|```/g,'').trim()));tmp._step='form';
-  }catch{tmp._step='form';toast('AI extraction failed - fill in manually');}
-  renderAdd();
-}
-function addAdd(f){const inp=document.getElementById(f==='issues'?'ai-inp':'at-inp');const v=inp?.value.trim();if(!v)return;if(!(tmp[f]||[]).includes(v))tmp[f]=[...(tmp[f]||[]),v];inp.value='';renderAdd();}
-function rmAdd(f,v){tmp[f]=(tmp[f]||[]).filter(x=>x!==v);renderAdd();}
-function saveNew(){
-  const name=document.getElementById('af-name')?.value.trim();if(!name){alert('Name is required.');return;}
-  const c={id:'c'+Date.now(),name,
-    title:document.getElementById('af-title')?.value.trim()||'',
-    org:document.getElementById('af-org')?.value.trim()||'',
-    email:document.getElementById('af-email')?.value.trim()||'',
-    phone:document.getElementById('af-phone')?.value.trim()||'',
-    source:document.getElementById('af-source')?.value.trim()||currentSource||'',
-    description:tmp._desc||'',issues:[...(tmp.issues||[])],tags:[...(tmp.tags||[])],
-    assignees:[...(tmp.assignees||[])],tasks:[],emailDraft:'',status:addTargetCol,createdAt:new Date().toISOString()};
-  contacts.push(c);syncOne(c);render();closeAdd();toast('Contact saved!');openPanel(c.id);
+
+// Restore session
+async function checkForSavedProgress() {
+  try {
+    const data = await api('/api/load-progress');
+    if (!data.found || !data.progress) return;
+    const p = data.progress;
+    if (!p.year || !p.step) return;
+    const hasDecisions = Object.keys(p.clusterDecisions||{}).length > 0 ||
+                         Object.keys(p.typeDecisions||{}).length    > 0 ||
+                         Object.keys(p.attrDecisions||{}).length    > 0;
+    if (!hasDecisions) return;
+    const resume = confirm('Resume previous session?\n\nYear: ' + p.year + '  Reviewer: ' + (p.reviewer||'unknown') + '\nSaved: ' + (p.savedAt ? new Date(p.savedAt).toLocaleString() : 'unknown'));
+    if (!resume) return;
+    if (p.reviewer && $('reviewer-name')) $('reviewer-name').value = p.reviewer;
+    if (p.year     && $('survey-year'))   $('survey-year').value   = p.year;
+    if (p.clusterDecisions) Object.assign(clusterDecisions, p.clusterDecisions);
+    if (p.separatedNames) { Object.entries(p.separatedNames).forEach(function(e){ separatedNames[e[0]] = new Set(e[1]); }); }
+    if (p.typeDecisions) Object.assign(typeDecisions, p.typeDecisions);
+    if (p.attrDecisions) Object.assign(attrDecisions, p.attrDecisions);
+    if (p.clusterFilter) clusterFilter = p.clusterFilter;
+    if (p.typeFilter)    typeFilter    = p.typeFilter;
+    if (p.attrFilter)    attrFilter    = p.attrFilter;
+    setSaveStatus('saved', 'Session restored');
+  } catch(e) {}
 }
 
-// ── Board management ──────────────────────────────────────────────────
-function getBoards(){
-  const fromContacts=[...new Set(contacts.map(c=>c.source||'').filter(Boolean))];
-  const saved=JSON.parse(localStorage.getItem('cf_boards')||'["Skoll World Forum"]');
-  // Saved boards first (preserving creation order), then any from contacts not yet saved
-  const all=[...saved];
-  fromContacts.forEach(b=>{if(!all.includes(b))all.push(b);});
-  return all;
-}
-
-function saveBoards(boards){
-  localStorage.setItem('cf_boards',JSON.stringify(boards));
-}
-
-function switchBoard(board){
-  currentBoard=board;
-  localStorage.setItem('cf_board',board);
-  activeTag='';
-  render();
-}
-
-function renderBoardTabs(){
-  const bar=document.getElementById('board-tabs-bar');
-  if(!bar)return;
-  bar.innerHTML='';
-
-  // All boards tab
-  const allBtn=document.createElement('button');
-  allBtn.className='btab all'+(currentBoard===''?' active':'');
-  allBtn.textContent='All events';
-  allBtn.onclick=()=>switchBoard('');
-  bar.appendChild(allBtn);
-
-  // Separator
-  const sep=document.createElement('span');
-  sep.style.cssText='width:1px;height:18px;background:var(--border);flex-shrink:0;';
-  bar.appendChild(sep);
-
-  // One tab per board
-  getBoards().forEach(board=>{
-    const count=contacts.filter(c=>c.source===board).length;
-    const btn=document.createElement('button');
-    btn.className='btab'+(currentBoard===board?' active':'');
-    btn.innerHTML=`<span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;">${esc(board)}</span><span style="margin-left:5px;font-size:10px;opacity:.6;">${count}</span>`;
-    btn.onclick=()=>switchBoard(board);
-    btn.title=board;
-    bar.appendChild(btn);
-  });
-
-  // New event button
-  const newBtn=document.createElement('button');
-  newBtn.className='btab-new';
-  newBtn.textContent='+ New event';
-  newBtn.onclick=openNewEventModal;
-  bar.appendChild(newBtn);
-}
-
-function openNewEventModal(){
-  document.getElementById('new-event-inp').value='';
-  document.getElementById('new-event-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('new-event-inp').focus(),100);
-}
-function closeNewEventModal(){document.getElementById('new-event-modal').classList.remove('open');}
-function createEventBoard(){
-  const name=document.getElementById('new-event-inp').value.trim();
-  if(!name){alert('Please enter an event name.');return;}
-  const boards=getBoards();
-  if(!boards.includes(name)){boards.push(name);saveBoards(boards);}
-  currentSource=name;
-  currentBoard=name;
-  localStorage.setItem('cf_source',name);
-  localStorage.setItem('cf_board',name);
-  closeNewEventModal();
-  render();
-  toast('Board created: '+name);
-}
-
-// ── API key ───────────────────────────────────────────────────────────
-function updatePill(){
-  const pill=document.getElementById('api-pill');const key=getKey();
-  if(key){pill.textContent='AI ready';pill.style.cssText='font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;background:#e4f4ef;color:#0d7a5f;border:1px solid #a7ddd0;cursor:pointer;';}
-  else{pill.textContent='Add API key';pill.style.cssText='font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;cursor:pointer;animation:pillpulse 2s infinite;';}
-}
-function maskKey(k){return k?k.slice(0,10)+'........'+k.slice(-4):'';}
-function openApiModal(){
-  const key=getKey();const wrap=document.getElementById('api-current-wrap');
-  document.getElementById('api-msg').textContent='';
-  document.getElementById('apikey').value='';
-  document.getElementById('apikey').type='password';
-  if(key){wrap.style.display='';document.getElementById('api-masked').textContent=maskKey(key);document.getElementById('api-input-label').textContent='Replace with a new key';document.getElementById('save-key-btn').disabled=false;document.getElementById('save-key-btn').style.opacity='1';}
-  else{wrap.style.display='none';document.getElementById('api-input-label').textContent='Enter your API key';document.getElementById('save-key-btn').disabled=true;document.getElementById('save-key-btn').style.opacity='.45';}
-  document.getElementById('test-btn').style.display='none';
-  document.getElementById('api-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('apikey').focus(),100);
-}
-function closeApiModal(){document.getElementById('api-modal').classList.remove('open');}
-function toggleShow(){const inp=document.getElementById('apikey');inp.type=inp.type==='password'?'text':'password';}
-function onKeyInput(){
-  const v=document.getElementById('apikey').value.trim();
-  const saveBtn=document.getElementById('save-key-btn');const testBtn=document.getElementById('test-btn');
-  document.getElementById('api-msg').textContent='';
-  if(v){const ok=v.startsWith('sk-ant-');saveBtn.disabled=!ok;saveBtn.style.opacity=ok?'1':'.45';testBtn.style.display=ok?'':'none';}
-  else{const has=!!getKey();saveBtn.disabled=!has;saveBtn.style.opacity=has?'1':'.45';testBtn.style.display='none';}
-}
-async function testKey(){
-  const v=document.getElementById('apikey').value.trim();if(!v)return;
-  const btn=document.getElementById('test-btn');btn.textContent='Testing...';btn.disabled=true;
-  document.getElementById('api-msg').style.color='#666';document.getElementById('api-msg').textContent='Sending test request...';
-  try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':v,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:10,messages:[{role:'user',content:'Hi'}]})});
-    const d=await r.json();
-    if(r.ok){document.getElementById('api-msg').style.color='#0d7a5f';document.getElementById('api-msg').textContent='Key works - ready to save';}
-    else{document.getElementById('api-msg').style.color='#c00';document.getElementById('api-msg').textContent='Error: '+(d?.error?.message||'Invalid key');}
-  }catch(e){document.getElementById('api-msg').style.color='#c00';document.getElementById('api-msg').textContent='Network error: '+e.message;}
-  btn.textContent='Test key';btn.disabled=false;
-}
-function saveApiKey(){
-  const v=document.getElementById('apikey').value.trim();const existing=getKey();const toSave=v||existing;
-  if(!toSave)return;localStorage.setItem('cf_api_key',toSave);updatePill();closeApiModal();toast(v?'API key saved':'Key unchanged');
-}
-function clearKey(){if(!confirm('Remove API key?'))return;localStorage.removeItem('cf_api_key');updatePill();closeApiModal();toast('API key removed');}
-
-// ── Toast ─────────────────────────────────────────────────────────────
-function toast(msg,dur=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
-
-// ── Init ──────────────────────────────────────────────────────────────
-(async()=>{
-  updatePill();
-  // Ensure Skoll World Forum always exists as a saved board
-  const _boards=JSON.parse(localStorage.getItem('cf_boards')||'[]');
-  if(!_boards.includes('Skoll World Forum')){_boards.unshift('Skoll World Forum');localStorage.setItem('cf_boards',JSON.stringify(_boards));}
-  if(!localStorage.getItem('cf_board')){localStorage.setItem('cf_board','Skoll World Forum');}
-  currentBoard=localStorage.getItem('cf_board')||'Skoll World Forum';
-  currentSource=localStorage.getItem('cf_source')||'Skoll World Forum';
-  // Set up drag drop
-  setupDragDrop();
-  // Always load fresh from Supabase first
-  await load();
-  render();
-  if(!getKey())setTimeout(openApiModal,800);
-})();
+document.addEventListener('DOMContentLoaded', function() {
+  checkForSavedProgress().catch(function(){});
+});
 </script>
 </body>
 </html>
