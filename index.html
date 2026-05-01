@@ -354,8 +354,20 @@ async function load(){
 
 async function syncOne(c){
   cacheLocal();setSyncStatus('syncing');
-  try{const{error}=await db.from('contacts').upsert(toDb(c));if(error)throw error;setSyncStatus('saved');}
-  catch(err){console.warn('Sync:',err.message);setSyncStatus('offline');}
+  try{
+    const{error}=await db.from('contacts').upsert(toDb(c));
+    if(error){
+      console.error('Sync error:',error);
+      setSyncStatus('offline');
+      toast('Save failed: '+error.message);
+      return;
+    }
+    setSyncStatus('saved');
+  }catch(err){
+    console.warn('Sync error:',err.message);
+    setSyncStatus('offline');
+    toast('Save failed: '+err.message);
+  }
 }
 
 async function deleteOne(id){
