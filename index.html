@@ -965,9 +965,7 @@ async function findLinkedIn(){
         max_tokens:1000,
         tools:[{type:'web_search_20250305',name:'web_search'}],
         system:'You find LinkedIn profile URLs. Search for the person and return ONLY their direct LinkedIn profile URL (e.g. https://www.linkedin.com/in/username). If you cannot find a confident match, return the text NOT_FOUND. Nothing else — no explanation.',
-        messages:[{role:'user',content:'Find the LinkedIn profile URL for: '+query+'
-
-Context: Name='+c.name+', Title='+(c.title||'unknown')+', Org='+(c.org||'unknown')}]
+        messages:[{role:'user',content:'Find the LinkedIn profile URL for: '+query+' Context: Name='+c.name+', Title='+(c.title||'unknown')+', Org='+(c.org||'unknown')}]
       })
     });
     const data=await resp.json();
