@@ -742,15 +742,16 @@ function tmplOverview(c){
     <div id="extract-result" style="display:none;font-size:12px;margin-top:6px;padding:8px 10px;border-radius:8px;background:#f5f3ff;border:1px solid #c4b5fd;color:#5b21b6;"></div>
   </div>
   <div class="psec">
-    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <label class="fl" style="margin:0;">LinkedIn</label>
-      <button id="linkedin-find-btn" style="font-size:11px;padding:4px 10px;color:#0077b5;border-color:#b3d4e8;background:#e8f4fb;">Find LinkedIn ✦</button>
-    </div>
-    <div id="linkedin-loading" style="display:none;font-size:12px;color:#0077b5;text-align:center;margin-bottom:4px;">Searching LinkedIn...</div>
+    <label class="fl" style="margin-bottom:6px;">LinkedIn</label>
     ${c.linkedin
-      ? '<div style="display:flex;align-items:center;gap:8px;"><a href="'+esc(c.linkedin)+'" target="_blank" rel="noopener" style="font-size:13px;color:#0077b5;text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.linkedin)+'</a><button id="linkedin-clear-btn" style="font-size:11px;padding:2px 8px;color:#b00;border-color:#fca5a5;background:#fee2e2;flex-shrink:0;">Clear</button></div>'
-      : '<div style="font-size:12px;color:var(--text3);">No LinkedIn profile saved yet.</div>'
+      ? '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><a href="'+esc(c.linkedin)+'" target="_blank" rel="noopener" style="font-size:13px;color:#0077b5;text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.linkedin)+'</a><button id="linkedin-clear-btn" style="font-size:11px;padding:2px 8px;color:#b00;border-color:#fca5a5;background:#fee2e2;flex-shrink:0;">Clear</button></div>'
+      : ''
     }
+    <div style="display:flex;gap:6px;">
+      <input type="text" id="linkedin-input" placeholder="Paste LinkedIn URL here..." style="flex:1;font-size:12px;" value="${esc(c.linkedin||'')}">
+      <button id="linkedin-save-btn" style="font-size:11px;padding:4px 10px;color:var(--teal);border-color:var(--teal);background:var(--teal-bg);">Save</button>
+      <button id="linkedin-search-btn" style="font-size:11px;padding:4px 10px;color:#0077b5;border-color:#b3d4e8;background:#e8f4fb;" title="Search Google for this person on LinkedIn">Search ↗</button>
+    </div>
   </div>
   <div class="psec"><label class="fl">Quick add task</label>
     <div class="row"><input type="text" id="quick-task" placeholder="Add a task..." style="flex:1;"><button id="quick-task-btn">Add</button></div>
@@ -840,10 +841,12 @@ function bindPanel(){
     }
   });
   // LinkedIn buttons
-  const linkedinBtn=document.getElementById('linkedin-find-btn');
-  if(linkedinBtn)linkedinBtn.onclick=findLinkedIn;
+  const linkedinSaveBtn=document.getElementById('linkedin-save-btn');
+  if(linkedinSaveBtn)linkedinSaveBtn.onclick=saveLinkedIn;
+  const linkedinSearchBtn=document.getElementById('linkedin-search-btn');
+  if(linkedinSearchBtn)linkedinSearchBtn.onclick=searchLinkedIn;
   const linkedinClearBtn=document.getElementById('linkedin-clear-btn');
-  if(linkedinClearBtn)linkedinClearBtn.onclick=()=>{if(confirm('Clear saved LinkedIn URL?')){updC({linkedin:''});renderPanelBody();}};
+  if(linkedinClearBtn)linkedinClearBtn.onclick=()=>{updC({linkedin:''});renderPanelBody();toast('LinkedIn URL cleared');};
   // Enrich notes button
   const enrichBtn=document.getElementById('enrich-btn');
   if(enrichBtn)enrichBtn.onclick=enrichNotes;
@@ -943,48 +946,22 @@ async function enrichNotes(){
   if(btn)btn.disabled=false;
 }
 
-async function findLinkedIn(){
-  const c=getC();
-  if(!c){toast('No contact selected');return;}
-  const btn=document.getElementById('linkedin-find-btn');
-  const loading=document.getElementById('linkedin-loading');
-  if(btn)btn.disabled=true;
-  if(loading)loading.style.display='block';
-
-  try{
-    const sys='You generate the most likely LinkedIn profile URL for a person based on their name, title, and organisation. LinkedIn profile URLs follow the pattern: https://www.linkedin.com/in/firstname-lastname or variations like firstname-lastname-title or firstname-lastname-orgname. Return ONLY a JSON object with two fields: {"url":"https://www.linkedin.com/in/...", "confidence":"high|medium|low"}. If you have very low confidence, set url to an empty string. No explanation, no markdown.';
-    const usr='Name: '+c.name+'
-Title: '+(c.title||'unknown')+'
-Organisation: '+(c.org||'unknown')+'
-Email (hint for name spelling): '+(c.email||'unknown');
-    const raw=await callAI(sys,usr);
-    const data=JSON.parse(raw.replace(/```json|```/g,'').trim());
-
-    if(data.url && data.url.includes('linkedin.com/in/')){
-      // Save the URL and also open a Google search so user can verify
-      const searchUrl='https://www.google.com/search?q=site:linkedin.com/in+'+encodeURIComponent(c.name)+'+'+encodeURIComponent(c.org||'');
-      updC({linkedin:data.url});
-      renderPanelBody();
-      if(data.confidence==='low'||data.confidence==='medium'){
-        toast('LinkedIn saved ('+data.confidence+' confidence — verify via search)');
-        window.open(searchUrl,'_blank');
-      } else {
-        toast('LinkedIn profile saved ✓');
-      }
-    } else {
-      // Fall back to opening a Google search for the user to find manually
-      const searchUrl='https://www.google.com/search?q=site:linkedin.com/in+'+encodeURIComponent(c.name)+'+'+encodeURIComponent(c.org||'');
-      window.open(searchUrl,'_blank');
-      toast('Could not determine URL — Google search opened to help you find it');
-    }
-  }catch(e){
-    console.error('LinkedIn find error:',e);
-    toast('Search failed: '+e.message);
-  }
-  if(btn)btn.disabled=false;
-  if(loading)loading.style.display='none';
+function saveLinkedIn(){
+  const c=getC();if(!c)return;
+  const inp=document.getElementById('linkedin-input');
+  if(!inp)return;
+  const url=inp.value.trim();
+  if(url && !url.includes('linkedin.com')){toast('Please enter a valid LinkedIn URL');return;}
+  updC({linkedin:url});
+  renderPanelBody();
+  toast(url ? 'LinkedIn profile saved ✓' : 'LinkedIn URL cleared');
 }
 
+function searchLinkedIn(){
+  const c=getC();if(!c)return;
+  const q=encodeURIComponent(c.name)+'+'+encodeURIComponent(c.org||'');
+  window.open('https://www.google.com/search?q=site:linkedin.com/in+'+q,'_blank');
+}
 async function extractToFields(){
   const c=getC();
   if(!c){toast('No contact selected');return;}
