@@ -371,8 +371,18 @@ async function syncOne(c){
 }
 
 async function deleteOne(id){
+  const backup=contacts.find(c=>c.id===id);
   contacts=contacts.filter(c=>c.id!==id);cacheLocal();render();
-  try{await db.from('contacts').delete().eq('id',id);}catch{}
+  try{
+    const{error}=await db.from('contacts').delete().eq('id',id);
+    if(error){
+      if(backup){contacts=[...contacts,backup];contacts.sort((a,b)=>a.created_at>b.created_at?1:-1);cacheLocal();render();}
+      toast('Delete failed: '+error.message);
+    }
+  }catch(e){
+    if(backup){contacts=[...contacts,backup];contacts.sort((a,b)=>a.created_at>b.created_at?1:-1);cacheLocal();render();}
+    toast('Delete failed — check connection');
+  }
 }
 
 function setSyncStatus(s){
