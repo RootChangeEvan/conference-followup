@@ -951,37 +951,31 @@ async function findLinkedIn(){
   if(btn)btn.disabled=true;
   if(loading)loading.style.display='block';
 
-  const key=getKey();
-  if(!key){toast('Add your Anthropic API key first');if(btn)btn.disabled=false;if(loading)loading.style.display='none';return;}
-
-  const query=[c.name,c.title,c.org].filter(Boolean).join(' ')+' LinkedIn profile';
-
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        system:'You find LinkedIn profile URLs. Search for the person and return ONLY their direct LinkedIn profile URL (e.g. https://www.linkedin.com/in/username). If you cannot find a confident match, return the text NOT_FOUND. Nothing else — no explanation.',
-        messages:[{role:'user',content:'Find the LinkedIn profile URL for: '+query+' Context: Name='+c.name+', Title='+(c.title||'unknown')+', Org='+(c.org||'unknown')}]
-      })
-    });
-    const data=await resp.json();
-    if(!resp.ok)throw new Error(data.error?.message||'API error');
+    const sys='You generate the most likely LinkedIn profile URL for a person based on their name, title, and organisation. LinkedIn profile URLs follow the pattern: https://www.linkedin.com/in/firstname-lastname or variations like firstname-lastname-title or firstname-lastname-orgname. Return ONLY a JSON object with two fields: {"url":"https://www.linkedin.com/in/...", "confidence":"high|medium|low"}. If you have very low confidence, set url to an empty string. No explanation, no markdown.';
+    const usr='Name: '+c.name+'
+Title: '+(c.title||'unknown')+'
+Organisation: '+(c.org||'unknown')+'
+Email (hint for name spelling): '+(c.email||'unknown');
+    const raw=await callAI(sys,usr);
+    const data=JSON.parse(raw.replace(/```json|```/g,'').trim());
 
-    // Extract URL from response text blocks
-    const text=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
-    const match=text.match(/https?:\/\/(?:www\.)?linkedin\.com\/in\/[\w-]+\/?/i);
-
-    if(match){
-      const url=match[0].replace(/\/$/,'');
-      updC({linkedin:url});
+    if(data.url && data.url.includes('linkedin.com/in/')){
+      // Save the URL and also open a Google search so user can verify
+      const searchUrl='https://www.google.com/search?q=site:linkedin.com/in+'+encodeURIComponent(c.name)+'+'+encodeURIComponent(c.org||'');
+      updC({linkedin:data.url});
       renderPanelBody();
-      toast('LinkedIn profile saved ✓');
+      if(data.confidence==='low'||data.confidence==='medium'){
+        toast('LinkedIn saved ('+data.confidence+' confidence — verify via search)');
+        window.open(searchUrl,'_blank');
+      } else {
+        toast('LinkedIn profile saved ✓');
+      }
     } else {
-      toast('Could not find a confident LinkedIn match');
+      // Fall back to opening a Google search for the user to find manually
+      const searchUrl='https://www.google.com/search?q=site:linkedin.com/in+'+encodeURIComponent(c.name)+'+'+encodeURIComponent(c.org||'');
+      window.open(searchUrl,'_blank');
+      toast('Could not determine URL — Google search opened to help you find it');
     }
   }catch(e){
     console.error('LinkedIn find error:',e);
