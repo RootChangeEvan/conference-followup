@@ -748,11 +748,8 @@ function tmplOverview(c){
     </div>
     <div id="linkedin-loading" style="display:none;font-size:12px;color:#0077b5;text-align:center;margin-bottom:4px;">Searching LinkedIn...</div>
     ${c.linkedin
-      ? `<div style="display:flex;align-items:center;gap:8px;">
-           <a href="${esc(c.linkedin)}" target="_blank" rel="noopener" style="font-size:13px;color:#0077b5;text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(c.linkedin)}">${esc(c.linkedin)}</a>
-           <button id="linkedin-clear-btn" style="font-size:11px;padding:2px 8px;color:#b00;border-color:#fca5a5;background:#fee2e2;flex-shrink:0;">Clear</button>
-         </div>`
-      : `<div style="font-size:12px;color:var(--text3);">No LinkedIn profile saved yet.</div>`
+      ? '<div style="display:flex;align-items:center;gap:8px;"><a href="'+esc(c.linkedin)+'" target="_blank" rel="noopener" style="font-size:13px;color:#0077b5;text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(c.linkedin)+'</a><button id="linkedin-clear-btn" style="font-size:11px;padding:2px 8px;color:#b00;border-color:#fca5a5;background:#fee2e2;flex-shrink:0;">Clear</button></div>'
+      : '<div style="font-size:12px;color:var(--text3);">No LinkedIn profile saved yet.</div>'
     }
   </div>
   <div class="psec"><label class="fl">Quick add task</label>
