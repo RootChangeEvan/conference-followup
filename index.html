@@ -464,9 +464,11 @@ function render(){
       if(q&&![c.name,c.org,c.source].some(v=>(v||'').toLowerCase().includes(q)))return false;
       return true;
     });
+    if(!el)return;
     el.innerHTML='';
     items.forEach(c=>el.appendChild(buildCard(c)));
-    document.getElementById('cnt-'+col).textContent=items.length;
+    const cnt=document.getElementById('cnt-'+col);
+    if(cnt)cnt.textContent=items.length;
   });
   renderTagBar();
   const tot=contacts.length,pen=contacts.reduce((n,c)=>n+(c.tasks||[]).filter(t=>!t.done).length,0);
@@ -593,6 +595,7 @@ function renderTagBar(){
   const boardContacts=currentBoard?contacts.filter(c=>c.source===currentBoard):contacts;
   const allTags=[...new Set(boardContacts.flatMap(c=>c.tags||[]))].sort();
   const bar=document.getElementById('tag-bar');
+  if(!bar)return;
   bar.innerHTML='';
   const allBtn=document.createElement('button');allBtn.className='tf'+(activeTag===''?' active':'');allBtn.textContent='All';
   allBtn.onclick=()=>{activeTag='';render();};bar.appendChild(allBtn);
