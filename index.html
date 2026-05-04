@@ -317,12 +317,13 @@ function toDb(c){
   return{id:c.id,name:c.name||'',title:c.title||'',org:c.org||'',email:c.email||'',phone:c.phone||'',
     description:c.description||'',issues:c.issues||[],tags:c.tags||[],assignees:c.assignees||[],
     tasks:c.tasks||[],email_draft:c.emailDraft||'',source:c.source||'',status:c.status||'todo',
+    linkedin:c.linkedin||'',
     created_at:c.createdAt||new Date().toISOString(),updated_at:new Date().toISOString()};
 }
 function fromDb(r){
   return{id:r.id,name:r.name||'',title:r.title||'',org:r.org||'',email:r.email||'',phone:r.phone||'',
     description:r.description||'',issues:r.issues||[],tags:r.tags||[],assignees:r.assignees||[],
-    tasks:r.tasks||[],emailDraft:r.email_draft||'',source:r.source||'Skoll World Forum',status:r.status||'todo',createdAt:r.created_at};
+    tasks:r.tasks||[],emailDraft:r.email_draft||'',source:r.source||'Skoll World Forum',status:r.status||'todo',createdAt:r.created_at,linkedin:r.linkedin||''};
 }
 
 // ── Storage ───────────────────────────────────────────────────────────
@@ -740,6 +741,20 @@ function tmplOverview(c){
     <div id="extract-loading" style="display:none;font-size:12px;color:#7c3aed;margin-top:6px;text-align:center;">Extracting fields...</div>
     <div id="extract-result" style="display:none;font-size:12px;margin-top:6px;padding:8px 10px;border-radius:8px;background:#f5f3ff;border:1px solid #c4b5fd;color:#5b21b6;"></div>
   </div>
+  <div class="psec">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <label class="fl" style="margin:0;">LinkedIn</label>
+      <button id="linkedin-find-btn" style="font-size:11px;padding:4px 10px;color:#0077b5;border-color:#b3d4e8;background:#e8f4fb;">Find LinkedIn ✦</button>
+    </div>
+    <div id="linkedin-loading" style="display:none;font-size:12px;color:#0077b5;text-align:center;margin-bottom:4px;">Searching LinkedIn...</div>
+    ${c.linkedin
+      ? `<div style="display:flex;align-items:center;gap:8px;">
+           <a href="${esc(c.linkedin)}" target="_blank" rel="noopener" style="font-size:13px;color:#0077b5;text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(c.linkedin)}">${esc(c.linkedin)}</a>
+           <button id="linkedin-clear-btn" style="font-size:11px;padding:2px 8px;color:#b00;border-color:#fca5a5;background:#fee2e2;flex-shrink:0;">Clear</button>
+         </div>`
+      : `<div style="font-size:12px;color:var(--text3);">No LinkedIn profile saved yet.</div>`
+    }
+  </div>
   <div class="psec"><label class="fl">Quick add task</label>
     <div class="row"><input type="text" id="quick-task" placeholder="Add a task..." style="flex:1;"><button id="quick-task-btn">Add</button></div>
   </div>
@@ -827,6 +842,11 @@ function bindPanel(){
       });
     }
   });
+  // LinkedIn buttons
+  const linkedinBtn=document.getElementById('linkedin-find-btn');
+  if(linkedinBtn)linkedinBtn.onclick=findLinkedIn;
+  const linkedinClearBtn=document.getElementById('linkedin-clear-btn');
+  if(linkedinClearBtn)linkedinClearBtn.onclick=()=>{if(confirm('Clear saved LinkedIn URL?')){updC({linkedin:''});renderPanelBody();}};
   // Enrich notes button
   const enrichBtn=document.getElementById('enrich-btn');
   if(enrichBtn)enrichBtn.onclick=enrichNotes;
@@ -924,6 +944,56 @@ async function enrichNotes(){
     setTimeout(()=>{if(loading)loading.style.display='none';},4000);
   }
   if(btn)btn.disabled=false;
+}
+
+async function findLinkedIn(){
+  const c=getC();
+  if(!c){toast('No contact selected');return;}
+  const btn=document.getElementById('linkedin-find-btn');
+  const loading=document.getElementById('linkedin-loading');
+  if(btn)btn.disabled=true;
+  if(loading)loading.style.display='block';
+
+  const key=getKey();
+  if(!key){toast('Add your Anthropic API key first');if(btn)btn.disabled=false;if(loading)loading.style.display='none';return;}
+
+  const query=[c.name,c.title,c.org].filter(Boolean).join(' ')+' LinkedIn profile';
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-beta':'interleaved-thinking-2025-05-14'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        tools:[{type:'web_search_20250305',name:'web_search'}],
+        system:'You find LinkedIn profile URLs. Search for the person and return ONLY their direct LinkedIn profile URL (e.g. https://www.linkedin.com/in/username). If you cannot find a confident match, return the text NOT_FOUND. Nothing else — no explanation.',
+        messages:[{role:'user',content:'Find the LinkedIn profile URL for: '+query+'
+
+Context: Name='+c.name+', Title='+(c.title||'unknown')+', Org='+(c.org||'unknown')}]
+      })
+    });
+    const data=await resp.json();
+    if(!resp.ok)throw new Error(data.error?.message||'API error');
+
+    // Extract URL from response text blocks
+    const text=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+    const match=text.match(/https?:\/\/(?:www\.)?linkedin\.com\/in\/[\w-]+\/?/i);
+
+    if(match){
+      const url=match[0].replace(/\/$/,'');
+      updC({linkedin:url});
+      renderPanelBody();
+      toast('LinkedIn profile saved ✓');
+    } else {
+      toast('Could not find a confident LinkedIn match');
+    }
+  }catch(e){
+    console.error('LinkedIn find error:',e);
+    toast('Search failed: '+e.message);
+  }
+  if(btn)btn.disabled=false;
+  if(loading)loading.style.display='none';
 }
 
 async function extractToFields(){
