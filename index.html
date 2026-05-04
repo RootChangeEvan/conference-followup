@@ -6,6 +6,7 @@
 <title>Follow-Up</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <style>
 :root{
   --bg:#f0efe9;--col:#e8e7e0;--surface:#fff;--border:#e0ddd4;--border2:#c8c5bb;
@@ -163,6 +164,7 @@ textarea{resize:vertical;line-height:1.6;}
     <input type="text" id="search" placeholder="Search contacts..." oninput="render()">
   </div>
   <div class="topbar-right">
+    <button id="map-toggle-btn" onclick="toggleMapView()" style="font-size:12px;font-weight:600;padding:6px 14px;border-radius:20px;border:1.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;">Map view</button>
     <button class="primary" onclick="openAdd()">+ Add contact</button>
     <button id="api-pill" onclick="openApiModal()" style="font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;gap:5px;transition:all .2s;"></button>
   </div>
@@ -199,6 +201,15 @@ textarea{resize:vertical;line-height:1.6;}
     <span id="sbar">Loading...</span>
     <span id="sync-status" style="margin-left:auto;display:flex;align-items:center;gap:5px;"></span>
   </div>
+</div>
+
+<!-- Map view -->
+<div id="map-wrap" style="display:none;flex:1;position:relative;overflow:hidden;background:#0c0e11;">
+  <canvas id="map-canvas" style="width:100%;height:100%;display:block;"></canvas>
+  <div id="map-legend" style="position:absolute;bottom:20px;left:20px;display:flex;flex-wrap:wrap;gap:6px;max-width:55%;"></div>
+  <div id="map-tooltip" style="position:fixed;display:none;background:rgba(12,14,17,0.96);border:0.5px solid rgba(255,255,255,0.14);border-radius:7px;padding:9px 13px;font-size:11px;pointer-events:none;box-shadow:0 4px 24px rgba(0,0,0,.4);max-width:220px;z-index:200;line-height:1.6;backdrop-filter:blur(10px);"></div>
+  <div style="position:absolute;top:14px;right:16px;font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:0.03em;">Drag · Scroll to zoom · Click to open contact</div>
+  <div style="position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:0.04em;text-transform:uppercase;" id="map-board-label"></div>
 </div>
 
 <!-- Side panel -->
@@ -1086,6 +1097,418 @@ async function genEmail(){
   renderPanelBody();
 }
 function copyEmail(){const t=document.getElementById('email-text')?.value;if(t)navigator.clipboard.writeText(t).then(()=>toast('Copied!'));}
+
+
+// ── Map view ──────────────────────────────────────────────────────────
+let mapVisible = false;
+let mapState = null; // holds simulation + canvas state
+
+const MAP_PALETTE = ['#e05555','#3db87a','#8b7ef0','#f5a623','#5a9aba','#e8845a','#4bc9a0','#b06ef0','#f5c842','#6ab0d4'];
+
+function toggleMapView(){
+  mapVisible = !mapVisible;
+  const boardWrap = document.querySelector('.board-wrap');
+  const mapWrap = document.getElementById('map-wrap');
+  const btn = document.getElementById('map-toggle-btn');
+  if(mapVisible){
+    boardWrap.style.display = 'none';
+    mapWrap.style.display = 'flex';
+    btn.textContent = 'Board view';
+    btn.style.background = '#1a1c21';
+    btn.style.color = '#e2ddd6';
+    btn.style.borderColor = 'rgba(255,255,255,0.2)';
+    requestAnimationFrame(renderMap);
+  } else {
+    if(mapState) { mapState.sim.stop(); mapState = null; }
+    boardWrap.style.display = '';
+    mapWrap.style.display = 'none';
+    btn.textContent = 'Map view';
+    btn.style.background = 'transparent';
+    btn.style.color = 'var(--text2)';
+    btn.style.borderColor = 'var(--border2)';
+  }
+}
+
+function renderMap(){
+  const canvas = document.getElementById('map-canvas');
+  const wrap = document.getElementById('map-wrap');
+  const legend = document.getElementById('map-legend');
+  const lbl = document.getElementById('map-board-label');
+  legend.innerHTML = '';
+  if(lbl) lbl.textContent = currentBoard || '';
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const boardContacts = currentBoard ? contacts.filter(c => c.source === currentBoard) : contacts;
+
+  if(!boardContacts.length){
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.font = '14px -apple-system,sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No contacts to map', W/2, H/2);
+    return;
+  }
+
+  // Build tag frequency
+  const tagFreq = {};
+  boardContacts.forEach(c => (c.tags||[]).forEach(t => { tagFreq[t] = (tagFreq[t]||0) + 1; }));
+  const allTags = Object.keys(tagFreq).sort((a,b) => tagFreq[b]-tagFreq[a]);
+
+  // Color map
+  const colorMap = {};
+  allTags.forEach((t,i) => { colorMap[t] = MAP_PALETTE[i % MAP_PALETTE.length]; });
+  colorMap['__none__'] = '#4a5568';
+
+  // Dominant tag per contact: tag shared with most other contacts
+  function dominantTag(c){
+    const tags = c.tags || [];
+    if(!tags.length) return '__none__';
+    return tags.reduce((best, t) => (tagFreq[t]||0) > (tagFreq[best]||0) ? t : best, tags[0]);
+  }
+
+  // Build nodes: TAG hubs + CONTACT nodes
+  const tagNodes = allTags.map((t,i) => ({
+    id: 'tag:'+t, label: t, type: 'tag', tag: t,
+    color: colorMap[t], count: tagFreq[t],
+    x: W/2 + Math.cos(i/allTags.length*Math.PI*2)*120,
+    y: H/2 + Math.sin(i/allTags.length*Math.PI*2)*120
+  }));
+
+  const contactNodes = boardContacts.map(c => ({
+    id: 'c:'+c.id, label: c.name, type: 'contact',
+    org: c.org||'', tags: c.tags||[], domTag: dominantTag(c),
+    color: colorMap[dominantTag(c)], contact: c,
+    x: W/2 + (Math.random()-.5)*W*.5,
+    y: H/2 + (Math.random()-.5)*H*.5
+  }));
+
+  const allNodes = [...tagNodes, ...contactNodes];
+  const nodeById = {};
+  allNodes.forEach(n => { nodeById[n.id] = n; });
+
+  // Links: each contact to each of its tags, contacts sharing tags to each other
+  const links = [];
+  contactNodes.forEach(cn => {
+    (cn.tags||[]).forEach(t => {
+      if(nodeById['tag:'+t]) links.push({source: cn, target: nodeById['tag:'+t], type:'hub'});
+    });
+  });
+
+  // Pan + zoom state
+  let tx=0, ty=0, scale=1;
+  let dragging=null, panStart=null, panTx=0, panTy=0;
+  let highlighted=null;
+
+  // Force simulation
+  const sim = d3.forceSimulation(allNodes)
+    .force('link', d3.forceLink(links).id(d=>d.id).distance(d => d.type==='hub' ? 100 : 70).strength(d => d.type==='hub' ? 0.5 : 0.08))
+    .force('charge', d3.forceManyBody().strength(n => n.type==='tag' ? -500 : -80))
+    .force('center', d3.forceCenter(W/2, H/2).strength(0.04))
+    .force('collision', d3.forceCollide(n => n.type==='tag' ? 44 : 20).strength(0.7))
+    .velocityDecay(0.65)
+    .alphaDecay(0.018)
+    .on('tick', draw);
+
+  function tagR(n){ return Math.max(20, 14 + Math.sqrt(n.count) * 5); }
+  function contactR(){ return 9; }
+
+  function draw(){
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(tx, ty);
+    ctx.scale(scale, scale);
+
+    // Draw hub links
+    links.forEach(l => {
+      const s = l.source, t = l.target;
+      if(!s.x||!t.x) return;
+      // A link is active if it connects to the hovered or selected cluster
+      // Source and target identification
+      const sIsContact = s.type==='contact', tIsTag = t.type==='tag';
+      const sInCluster = selected && (s.tags||[]).includes(selected);
+      const tIsSelHub = selected && t.tag===selected;
+      const tIsSecondaryHub = selected && tIsTag && !tIsSelHub && sInCluster;
+      const sInContactFocus = selectedContact && s.id===selectedContact.id;
+      const tInContactFocusTags = selectedContact && tIsTag && (selectedContact.tags||[]).includes(t.tag);
+
+      // Primary link: member → selected hub
+      const isPrimary = tIsSelHub && sInCluster;
+      // Secondary link: member → other tag hubs they belong to
+      const isSecondary = tIsSecondaryHub;
+      // Contact focus links
+      const isContactLink = sInContactFocus && tInContactFocusTags;
+      // Hover highlight
+      const isHovered = highlighted && (s.id===highlighted||t.id===highlighted||t.tag===highlighted);
+
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(t.x, t.y);
+      ctx.strokeStyle = t.color || s.color || '#888';
+      if(isPrimary || isContactLink || isHovered) {
+        ctx.globalAlpha = 0.65; ctx.lineWidth = 1.5;
+      } else if(isSecondary) {
+        ctx.globalAlpha = 0.25; ctx.lineWidth = 0.8;
+      } else if(selected || selectedContact) {
+        ctx.globalAlpha = 0.02; ctx.lineWidth = 0.5;
+      } else {
+        ctx.globalAlpha = highlighted ? 0.05 : 0.38; ctx.lineWidth = 0.8;
+      }
+      ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+
+    // Draw contact nodes
+    contactNodes.forEach(n => {
+      if(!n.x) return;
+      const isHl = highlighted === n.id || (selectedContact && selectedContact.id === n.id);
+      const tagHl = (highlighted && highlighted.startsWith('tag:') && (n.tags||[]).includes(highlighted.replace('tag:','')))
+                  || (selected && (n.tags||[]).includes(selected));
+      const dim = (highlighted || selected || selectedContact) && !isHl && !tagHl;
+      const r = contactR();
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI*2);
+      ctx.fillStyle = n.color;
+      ctx.globalAlpha = isHl ? 1 : (tagHl ? 0.9 : (dim ? 0.08 : 0.75));
+      ctx.fill();
+      if(isHl || tagHl){
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 1;
+        ctx.stroke();
+        // label
+        const first = n.label.split(' ')[0];
+        ctx.font = '500 10px -apple-system,sans-serif';
+        ctx.fillStyle = '#e2ddd6';
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = 0.95;
+        ctx.fillText(first, n.x, n.y + r + 12);
+      } else if(!dim && scale > 1.4){
+        const first = n.label.split(' ')[0];
+        ctx.font = '9px -apple-system,sans-serif';
+        ctx.fillStyle = 'rgba(226,221,214,0.7)';
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = 0.7;
+        ctx.fillText(first, n.x, n.y + r + 11);
+      }
+      ctx.globalAlpha = 1;
+    });
+
+    // Draw tag hub nodes (on top)
+    tagNodes.forEach(n => {
+      if(!n.x) return;
+      const isHl = (highlighted && n.id === highlighted) || (selected && n.tag === selected)
+                 || (selectedContact && (selectedContact.tags||[]).includes(n.tag));
+      const contactHoveredTagHl = highlighted && highlighted.startsWith('c:') && (() => {
+        const hc = contactNodes.find(cn => cn.id === highlighted);
+        return hc && (hc.tags||[]).includes(n.tag);
+      })();
+      // Is this a secondary hub — a tag that cluster members also belong to?
+      const isSecondaryHub = selected && !isHl && !contactHoveredTagHl &&
+        contactNodes.some(cn => (cn.tags||[]).includes(selected) && (cn.tags||[]).includes(n.tag));
+      const dim = (highlighted || selected || selectedContact) && !isHl && !contactHoveredTagHl && !isSecondaryHub;
+      const r = tagR(n);
+      // Glow
+      if(!dim){
+        const grd = ctx.createRadialGradient(n.x, n.y, r*.3, n.x, n.y, r*2.2);
+        grd.addColorStop(0, n.color+'33');
+        grd.addColorStop(1, n.color+'00');
+        ctx.beginPath(); ctx.arc(n.x, n.y, r*2.2, 0, Math.PI*2);
+        ctx.fillStyle = grd; ctx.globalAlpha = (isHl||contactHoveredTagHl)?1:(isSecondaryHub?0.3:0.5); ctx.fill();
+      }
+      // Circle
+      ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI*2);
+      ctx.fillStyle = n.color+'22';
+      ctx.globalAlpha = dim ? 0.04 : (isSecondaryHub ? 0.35 : 0.9); ctx.fill();
+      ctx.strokeStyle = n.color;
+      ctx.lineWidth = isHl ? 2.5 : 1.5;
+      ctx.globalAlpha = (isHl||contactHoveredTagHl) ? 1 : (dim ? 0.04 : (isSecondaryHub ? 0.35 : 0.85)); ctx.stroke();
+      // Label
+      ctx.globalAlpha = (isHl||contactHoveredTagHl) ? 1 : (dim ? 0.04 : (isSecondaryHub ? 0.35 : 0.85));
+      ctx.font = (isHl?'600 ':'500 ') + Math.min(12, Math.max(9, r*.55)) + 'px -apple-system,sans-serif';
+      ctx.fillStyle = isHl ? '#ffffff' : n.color;
+      ctx.textAlign = 'center';
+      ctx.fillText(n.label, n.x, n.y - 2);
+      ctx.font = '9px -apple-system,sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillText(n.count + (n.count===1?' contact':' contacts'), n.x, n.y + 12);
+      ctx.globalAlpha = 1;
+    });
+
+    ctx.restore();
+  }
+
+  // Tooltip
+  const tip = document.getElementById('map-tooltip');
+  function hitTest(mx, my){
+    const wx = (mx - tx) / scale;
+    const wy = (my - ty) / scale;
+    // Check tag nodes first (on top)
+    for(const n of tagNodes){
+      if(!n.x) continue;
+      const r = tagR(n);
+      if((wx-n.x)**2+(wy-n.y)**2 < r*r) return n;
+    }
+    for(const n of contactNodes){
+      if(!n.x) continue;
+      const r = contactR() + 4;
+      if((wx-n.x)**2+(wy-n.y)**2 < r*r) return n;
+    }
+    return null;
+  }
+
+  // Selected cluster state (click on tag hub to lock)
+  let selected = null; // tag string of locked cluster
+  let selectedContact = null; // contact node of focused contact
+
+  function selectCluster(tagStr){
+    if(selected === tagStr && !selectedContact){ deselect(); return; }
+    selected = tagStr; selectedContact = null;
+    const hub = tagNodes.find(n => n.tag === tagStr);
+    const members = contactNodes.filter(n => (n.tags||[]).includes(tagStr));
+    if(hub){
+      hub.fx = W/2; hub.fy = H/2;
+      const r = Math.max(90, 45 + members.length * 16);
+      members.forEach((n, i) => {
+        const angle = (i / members.length) * Math.PI * 2 - Math.PI/2;
+        n.fx = W/2 + Math.cos(angle) * r;
+        n.fy = H/2 + Math.sin(angle) * r;
+      });
+    }
+    // Release non-member contacts so they drift away
+    contactNodes.forEach(n => { if(!(n.tags||[]).includes(tagStr)){ n.fx=null; n.fy=null; } });
+    // Release other tag hubs — they'll float but stay on screen
+    tagNodes.forEach(n => { if(n.tag !== tagStr){ n.fx=null; n.fy=null; } });
+    sim.alpha(0.4).restart();
+    tx=0; ty=0; scale=1;
+  }
+
+  function selectContact(cn){
+    if(selectedContact && selectedContact.id === cn.id){ deselect(); return; }
+    selectedContact = cn; selected = null;
+    const myTags = cn.tags || [];
+    // Fix contact at center
+    cn.fx = W/2; cn.fy = H/2;
+    // Fix its tag hubs in a ring around it
+    const hubR = Math.max(110, 60 + myTags.length * 28);
+    myTags.forEach((t, i) => {
+      const hub = tagNodes.find(n => n.tag === t);
+      if(hub){
+        const angle = (i / myTags.length) * Math.PI * 2 - Math.PI/2;
+        hub.fx = W/2 + Math.cos(angle) * hubR;
+        hub.fy = H/2 + Math.sin(angle) * hubR;
+      }
+    });
+    // Release all other nodes so they drift away
+    tagNodes.forEach(n => { if(!myTags.includes(n.tag)){ n.fx=null; n.fy=null; } });
+    contactNodes.forEach(n => { if(n.id !== cn.id){ n.fx=null; n.fy=null; } });
+    sim.alpha(0.5).restart();
+    tx=0; ty=0; scale=1;
+  }
+
+  function deselect(){
+    selected = null; selectedContact = null;
+    allNodes.forEach(n => { n.fx=null; n.fy=null; });
+    sim.alpha(0.3).restart();
+  }
+
+  function showTip(e, hit){
+    tip.style.display = 'block';
+    tip.style.left = (e.clientX+14)+'px';
+    tip.style.top = (e.clientY-10)+'px';
+    if(hit.type==='tag'){
+      const members = contactNodes.filter(n=>(n.tags||[]).includes(hit.tag)).map(n=>n.label).join(', ');
+      tip.innerHTML = '<strong style="color:'+hit.color+'">'+hit.label+'</strong><br><span style="color:rgba(255,255,255,0.4)">'+hit.count+' contact'+(hit.count!==1?'s':'')+'</span>'+(members?'<br><span style="color:rgba(255,255,255,0.3);font-size:10px;">'+members+'</span>':'')+'<br><span style="color:rgba(255,255,255,0.25);font-size:10px;margin-top:2px;display:block;">Click to focus cluster</span>';
+    } else {
+      tip.innerHTML = '<strong style="color:#e2ddd6">'+hit.label+'</strong>'+(hit.org?'<br><span style="color:rgba(255,255,255,0.4)">'+hit.org+'</span>':'')+(hit.tags.length?'<br><span style="color:rgba(255,255,255,0.3);font-size:10px;">'+hit.tags.join(', ')+'</span>':'')+'<br><span style="color:rgba(255,255,255,0.25);font-size:10px;margin-top:2px;display:block;">Click to open</span>';
+    }
+  }
+
+  canvas.onmousedown = e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const hit = hitTest(mx, my);
+    if(hit){ dragging = hit; if(!selected) sim.alphaTarget(0.15).restart(); }
+    else { panStart = {x:e.clientX,y:e.clientY}; panTx=tx; panTy=ty; canvas.style.cursor='grabbing'; }
+  };
+
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    if(dragging){
+      dragging.fx = (mx - tx)/scale;
+      dragging.fy = (my - ty)/scale;
+      draw(); return;
+    }
+    if(panStart){
+      tx = panTx + (e.clientX - panStart.x);
+      ty = panTy + (e.clientY - panStart.y);
+      draw(); return;
+    }
+    const hit = hitTest(mx, my);
+    canvas.style.cursor = hit ? 'pointer' : (selected ? 'default' : 'grab');
+    if(hit){ highlighted = hit.id; showTip(e, hit); }
+    else { highlighted = null; tip.style.display = 'none'; }
+    draw();
+  };
+
+  canvas.onmouseleave = () => { tip.style.display='none'; highlighted=null; draw(); };
+
+  canvas.onmouseup = e => {
+    if(dragging){ 
+      // If not selected mode, release node to float free
+      if(!selected){ dragging.fx=null; dragging.fy=null; sim.alphaTarget(0); }
+      dragging=null;
+    }
+    if(panStart){ panStart=null; canvas.style.cursor = selected?'default':'grab'; }
+  };
+
+  canvas.onclick = e => {
+    const rect = canvas.getBoundingClientRect();
+    const hit = hitTest(e.clientX-rect.left, e.clientY-rect.top);
+    if(!hit){ if(selected||selectedContact) deselect(); return; }
+    if(hit.type==='tag'){
+      // If in contact-focus mode, clicking a tag hub enters that cluster
+      if(selectedContact){ selectCluster(hit.tag); return; }
+      selectCluster(hit.tag); return;
+    }
+    if(hit.type==='contact'){
+      // If already focused on this contact, open panel; otherwise focus
+      if(selectedContact && selectedContact.id === hit.id){ openPanel(hit.contact); return; }
+      selectContact(hit);
+    }
+  };
+
+  canvas.onwheel = e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const delta = e.deltaY > 0 ? 0.85 : 1.18;
+    const newScale = Math.max(0.2, Math.min(5, scale*delta));
+    tx = mx - (mx-tx)*(newScale/scale);
+    ty = my - (my-ty)*(newScale/scale);
+    scale = newScale;
+    draw();
+  };
+
+  // Legend — clicking focuses that cluster
+  allTags.slice(0,12).forEach(t => {
+    const el = document.createElement('div');
+    el.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(226,221,214,0.7);background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.12);border-radius:20px;padding:3px 9px;cursor:pointer;transition:background 0.15s;';
+    el.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:'+colorMap[t]+';flex-shrink:0;"></span>'+t+'<span style="color:rgba(255,255,255,0.3);margin-left:2px;">('+tagFreq[t]+')</span>';
+    el.onclick = () => selectCluster(t);
+    legend.appendChild(el);
+  });
+
+  mapState = {sim, draw};
+}
 
 // ── Add contact ───────────────────────────────────────────────────────
 let tmp={};
